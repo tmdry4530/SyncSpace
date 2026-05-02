@@ -172,6 +172,89 @@ pnpm run dev:frontend
 pnpm run dev:backend
 ```
 
+## 배포 방법
+
+권장 배포 구조는 **Supabase + Railway backend + Vercel frontend**입니다. Vercel은 Vite React 정적 프론트에 적합하고, SyncSpace 백엔드는 WebSocket을 유지해야 하므로 Railway 같은 장기 실행 Node 서비스에 배포합니다.
+
+### 1. Supabase 준비
+
+1. Supabase 프로젝트를 생성합니다.
+2. SQL Editor에서 아래 순서로 실행합니다.
+
+```sql
+-- 1
+supabase/schema.sql
+
+-- 2
+supabase/rls.sql
+
+-- 3, 선택
+supabase/seed.sql
+```
+
+3. Project Settings에서 아래 값을 복사합니다.
+   - Project URL
+   - anon public key
+   - service_role key
+
+`service_role key`는 Railway 백엔드에만 넣고, Vercel 프론트에는 절대 넣지 않습니다.
+
+### 2. Railway backend 배포
+
+GitHub repo `tmdry4530/SyncSpace`를 Railway에 연결합니다. 이 레포에는 `railway.json`이 있어서 build/start command는 자동으로 맞춰집니다.
+
+Backend 환경 변수:
+
+```env
+NODE_ENV=production
+HOST=0.0.0.0
+ALLOWED_ORIGINS=https://your-frontend.vercel.app
+WS_AUTH_MODE=supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+LOG_LEVEL=info
+```
+
+문서 Yjs snapshot을 재시작 후에도 보존하려면 Railway Volume을 `/data`에 붙이고 아래 값도 추가합니다.
+
+```env
+SYNCSPACE_DOC_PERSISTENCE_DIR=/data/ydocs
+```
+
+배포 후 backend URL의 `/health`가 JSON을 반환하면 정상입니다.
+
+```txt
+https://your-backend.up.railway.app/health
+```
+
+### 3. Vercel frontend 배포
+
+GitHub repo `tmdry4530/SyncSpace`를 Vercel에 연결합니다. 이 레포에는 `vercel.json`이 있어서 Vite build와 SPA route rewrite가 적용됩니다.
+
+Frontend 환경 변수:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_API_URL=https://your-backend.up.railway.app
+VITE_WS_URL=wss://your-backend.up.railway.app
+VITE_WS_AUTH_MODE=supabase
+```
+
+Vercel에 `SUPABASE_SERVICE_ROLE_KEY`를 넣지 마세요. 프론트 번들에는 `VITE_` 값만 들어가야 합니다.
+
+### 4. 배포 후 확인
+
+1. Vercel URL 접속
+2. 회원가입/로그인
+3. 워크스페이스 생성
+4. 채널 메시지 전송
+5. 문서 편집
+6. 다른 브라우저에서 같은 워크스페이스 접속
+7. 채팅과 문서가 새로고침 없이 동기화되는지 확인
+
+프론트 도메인을 바꾸면 Railway의 `ALLOWED_ORIGINS`도 새 도메인으로 바꾸고 백엔드를 재배포해야 합니다.
+
 ## 검증 명령
 
 ```bash

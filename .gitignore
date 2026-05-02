@@ -1,0 +1,26 @@
+node_modules/
+.pnpm-store/
+dist/
+server/dist/
+.env
+.env.*
+!.env.example
+.syncspace-data/
+server/.syncspace-data/
+coverage/
+.vite/
+playwright-report/
+test-results/
+!test-results/.gitkeep
+
+# Local agent and QA artifacts
+.omx/
+.gstack/
+dogfood-output/
+stitch-output/
+playwright-report/
+*.log
+
+# Lighthouse temporary profiles accidentally created on Windows-style paths
+C:\\Users*/
+C:\Users*/

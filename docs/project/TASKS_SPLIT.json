@@ -1,0 +1,120 @@
+{
+  "project": "SyncSpace",
+  "mode": "frontend_manual_backend_ai",
+  "rules": {
+    "frontend_core": "human",
+    "backend": "ai",
+    "frontend_ai_role": [
+      "tutor",
+      "reviewer",
+      "test_assistant",
+      "debugger"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "B-001",
+      "area": "backend",
+      "owner": "ai",
+      "title": "Create Supabase schema and RLS policies",
+      "status": "todo",
+      "protected_frontend": false
+    },
+    {
+      "id": "B-002",
+      "area": "backend",
+      "owner": "ai",
+      "title": "Implement Node.js WebSocket server with y-websocket routing",
+      "status": "todo",
+      "protected_frontend": false
+    },
+    {
+      "id": "B-003",
+      "area": "backend",
+      "owner": "ai",
+      "title": "Implement chat persistence adapter",
+      "status": "todo",
+      "protected_frontend": false
+    },
+    {
+      "id": "B-004",
+      "area": "backend",
+      "owner": "ai",
+      "title": "Add backend tests and environment docs",
+      "status": "todo",
+      "protected_frontend": false
+    },
+    {
+      "id": "F-001",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement app router and providers",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-002",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement Zustand UI stores",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-003",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement TanStack Query key factories and hooks",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-004",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement workspace shell and sidebar",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-005",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement chat panel and scroll restoration",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-006",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement Yjs chat room hook",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-007",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement Tiptap collaborative editor",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-008",
+      "area": "frontend",
+      "owner": "human",
+      "title": "Implement presence UI",
+      "status": "todo",
+      "protected_frontend": true
+    },
+    {
+      "id": "F-009",
+      "area": "frontend",
+      "owner": "human_with_ai_review",
+      "title": "Add frontend tests after manual implementation",
+      "status": "todo",
+      "protected_frontend": true
+    }
+  ]
+}

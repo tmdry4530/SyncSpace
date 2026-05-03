@@ -7,18 +7,58 @@ server/dist/
 !.env.example
 .syncspace-data/
 server/.syncspace-data/
-coverage/
 .vite/
+
+# Repository docs are local-only
+docs/
+
+# Markdown documentation/drafts: keep root README only
+*.md
+!/README.md
+
+# Test scripts and test output
+scripts/verify-*.sh
+scripts/*test*
+scripts/*spec*
+e2e/
+test/
+tests/
+__tests__/
+__snapshots__/
+*.test.*
+*.spec.*
+*.e2e.*
+*.snap
+playwright.config.*
+vitest.config.*
+cypress.config.*
+coverage/
 playwright-report/
 test-results/
-!test-results/.gitkeep
+.playwright/
+.nyc_output/
+lcov.info
+*.lcov
+junit*.xml
+*.tap
+*.trx
 
-# Local agent and QA artifacts
+# Local agent, AI, and QA artifacts
 .omx/
 .gstack/
+.codex/
+.claude/
+.agents/
+.cursor/
+.ai/
+.ai-*/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+CODEX.md
+.cursorrules
 dogfood-output/
 stitch-output/
-playwright-report/
 *.log
 
 # Lighthouse temporary profiles accidentally created on Windows-style paths

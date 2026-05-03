@@ -12,10 +12,9 @@ server/.syncspace-data/
 # Repository docs are local-only
 docs/
 
-# Markdown documentation/drafts: keep root README and explicit learning guide only
+# Markdown documentation/drafts: keep root README only
 *.md
 !/README.md
-!/REACT_CODE_GUIDE.md
 
 # Test scripts and test output
 scripts/verify-*.sh

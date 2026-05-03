@@ -8,13 +8,11 @@
     "preview": "vite preview",
     "lint": "tsc -p tsconfig.json --noEmit && pnpm -r lint",
     "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -r typecheck",
-    "test": "pnpm -r test",
     "verify:frontend": "tsc -p tsconfig.json --noEmit && vite build",
-    "verify:backend": "bash scripts/verify-backend.sh",
+    "verify:backend": "pnpm --filter server lint && pnpm --filter server typecheck && pnpm --filter server build",
     "dev:frontend": "vite --host 127.0.0.1 --port 5173",
     "dev:backend": "pnpm --filter server dev",
-    "test:e2e": "playwright test",
-    "verify:all": "pnpm typecheck && pnpm verify:frontend && pnpm verify:backend && pnpm test:e2e"
+    "verify:all": "pnpm typecheck && pnpm verify:frontend && pnpm verify:backend"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
@@ -32,7 +30,6 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",

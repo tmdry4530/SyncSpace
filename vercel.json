@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm verify:frontend",
+  "buildCommand": "pnpm run verify:frontend",
   "outputDirectory": "dist",
   "rewrites": [
     {

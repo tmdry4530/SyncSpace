@@ -24,14 +24,12 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const host = env.HOST?.trim() || '0.0.0.0'
   const port = parsePort(env.PORT, 1234)
   const allowedOrigins = parseList(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS)
-  const supabaseUrl = nonEmpty(env.SUPABASE_URL)
-  const supabaseServiceRoleKey = nonEmpty(env.SUPABASE_SERVICE_ROLE_KEY)
+  const supabaseUrl = readFirstEnv(env, ['SUPABASE_URL', 'VITE_SUPABASE_URL'])
+  const supabaseServiceRoleKey = readFirstEnv(env, ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY', 'SERVICE_ROLE_KEY'])
   const wsAuthMode = parseAuthMode(env.WS_AUTH_MODE, nodeEnv)
   const logLevel = parseLogLevel(env.LOG_LEVEL)
 
-  if (wsAuthMode === 'supabase' && (!supabaseUrl || !supabaseServiceRoleKey)) {
-    throw new Error('WS_AUTH_MODE=supabase requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
-  }
+  assertSupabaseAuthConfig(wsAuthMode, { supabaseUrl, supabaseServiceRoleKey })
 
   return {
     nodeEnv,
@@ -48,6 +46,33 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
 function nonEmpty(value: string | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+function readFirstEnv(env: NodeJS.ProcessEnv, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = nonEmpty(env[key])
+    if (value) return value
+  }
+  return null
+}
+
+function assertSupabaseAuthConfig(
+  wsAuthMode: RealtimeAuthMode,
+  config: Pick<ServerConfig, 'supabaseUrl' | 'supabaseServiceRoleKey'>
+): void {
+  if (wsAuthMode !== 'supabase') return
+
+  const missing = [
+    config.supabaseUrl ? null : 'SUPABASE_URL',
+    config.supabaseServiceRoleKey ? null : 'SUPABASE_SERVICE_ROLE_KEY'
+  ].filter(Boolean)
+
+  if (missing.length > 0) {
+    throw new Error(
+      `WS_AUTH_MODE=supabase is enabled, but the backend process is missing: ${missing.join(', ')}. ` +
+        'Set these on the Railway backend service Variables, not only on Vercel or another service.'
+    )
+  }
 }
 
 function parsePort(value: string | undefined, fallback: number): number {

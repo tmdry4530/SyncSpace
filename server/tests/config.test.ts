@@ -11,7 +11,18 @@ describe('readConfig', () => {
   })
 
   it('requires Supabase server secrets when auth mode is supabase', () => {
-    expect(() => readConfig({ WS_AUTH_MODE: 'supabase' })).toThrow(/SUPABASE_URL/)
+    expect(() => readConfig({ WS_AUTH_MODE: 'supabase' })).toThrow(/Railway backend service Variables/)
+  })
+
+  it('accepts common Railway/Supabase alias names for backend auth config', () => {
+    const config = readConfig({
+      WS_AUTH_MODE: 'supabase',
+      VITE_SUPABASE_URL: 'https://example.supabase.co',
+      SUPABASE_SERVICE_KEY: 'server-secret'
+    })
+
+    expect(config.supabaseUrl).toBe('https://example.supabase.co')
+    expect(config.supabaseServiceRoleKey).toBe('server-secret')
   })
 
   it('allows wildcard origins only when explicitly configured', () => {

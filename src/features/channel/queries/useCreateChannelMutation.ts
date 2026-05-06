@@ -1,16 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { getAuthenticatedUser } from '../../../shared/api/auth'
 import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
-import { useAuthStore } from '../../../shared/stores/authStore'
 import type { Channel } from '../../../shared/types/contracts'
 import { workspaceKeys } from '../../workspace/queries/useWorkspacesQuery'
 import { mapChannel } from './useChannelsQuery'
 
 export function useCreateChannelMutation(workspaceId: string | null | undefined) {
   const queryClient = useQueryClient()
-  const user = useAuthStore((state) => state.user)
-
   return useMutation({
-    mutationFn: async (input: { name: string }) => createChannel({ workspaceId: workspaceId!, name: input.name }, user?.id ?? null),
+    mutationFn: async (input: { name: string }) => createChannel({ workspaceId: workspaceId!, name: input.name }),
     onSuccess: (channel) => {
       if (!workspaceId) return
       queryClient.setQueryData<Channel[]>(workspaceKeys.channels(workspaceId), (current = []) => {
@@ -22,12 +20,12 @@ export function useCreateChannelMutation(workspaceId: string | null | undefined)
   })
 }
 
-async function createChannel(input: { workspaceId: string; name: string }, userId: string | null): Promise<Channel> {
-  if (!userId) throw new Error('로그인이 필요합니다.')
+async function createChannel(input: { workspaceId: string; name: string }): Promise<Channel> {
   const supabase = requireSupabaseClient()
+  const user = await getAuthenticatedUser(supabase)
   const { error: insertError } = await supabase
     .from('channels')
-    .insert({ workspace_id: input.workspaceId, name: input.name, created_by: userId })
+    .insert({ workspace_id: input.workspaceId, name: input.name, created_by: user.id })
 
   if (insertError) throw insertError
 

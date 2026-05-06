@@ -1,16 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { getAuthenticatedUser } from '../../../shared/api/auth'
 import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
-import { useAuthStore } from '../../../shared/stores/authStore'
 import type { DocumentMeta } from '../../../shared/types/contracts'
 import { workspaceKeys } from '../../workspace/queries/useWorkspacesQuery'
 import { mapDocument } from './useDocumentsQuery'
 
 export function useCreateDocumentMutation(workspaceId: string | null | undefined) {
   const queryClient = useQueryClient()
-  const user = useAuthStore((state) => state.user)
-
   return useMutation({
-    mutationFn: async (input: { title: string }) => createDocument({ workspaceId: workspaceId!, title: input.title }, user?.id ?? null),
+    mutationFn: async (input: { title: string }) => createDocument({ workspaceId: workspaceId!, title: input.title }),
     onSuccess: (document) => {
       if (!workspaceId) return
       queryClient.setQueryData<DocumentMeta[]>(workspaceKeys.documents(workspaceId), (current = []) => {
@@ -22,12 +20,12 @@ export function useCreateDocumentMutation(workspaceId: string | null | undefined
   })
 }
 
-async function createDocument(input: { workspaceId: string; title: string }, userId: string | null): Promise<DocumentMeta> {
-  if (!userId) throw new Error('로그인이 필요합니다.')
+async function createDocument(input: { workspaceId: string; title: string }): Promise<DocumentMeta> {
   const supabase = requireSupabaseClient()
+  const user = await getAuthenticatedUser(supabase)
   const { error: insertError } = await supabase
     .from('documents')
-    .insert({ workspace_id: input.workspaceId, title: input.title, created_by: userId })
+    .insert({ workspace_id: input.workspaceId, title: input.title, created_by: user.id })
 
   if (insertError) throw insertError
 

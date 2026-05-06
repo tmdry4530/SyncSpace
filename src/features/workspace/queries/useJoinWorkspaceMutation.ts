@@ -1,17 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { User } from '@supabase/supabase-js'
 import { postBackendJson } from '../../../shared/api/backendClient'
+import { getAuthenticatedUser } from '../../../shared/api/auth'
 import { ensureUserProfile } from '../../../shared/api/profiles'
-import { useAuthStore } from '../../../shared/stores/authStore'
+import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
 import type { Workspace } from '../../../shared/types/contracts'
 import { workspaceKeys } from './useWorkspacesQuery'
 
 export function useJoinWorkspaceMutation() {
   const queryClient = useQueryClient()
-  const user = useAuthStore((state) => state.user)
-
   return useMutation({
-    mutationFn: async (input: { inviteCode: string }) => joinWorkspaceByInviteCode(input, user ?? null),
+    mutationFn: joinWorkspaceByInviteCode,
     onSuccess: (workspace) => {
       queryClient.setQueryData<Workspace[]>(workspaceKeys.lists(), (current = []) => {
         if (current.some((item) => item.id === workspace.id)) return current
@@ -22,8 +20,9 @@ export function useJoinWorkspaceMutation() {
   })
 }
 
-async function joinWorkspaceByInviteCode(input: { inviteCode: string }, user: User | null): Promise<Workspace> {
-  if (!user) throw new Error('로그인이 필요합니다.')
+async function joinWorkspaceByInviteCode(input: { inviteCode: string }): Promise<Workspace> {
+  const supabase = requireSupabaseClient()
+  const user = await getAuthenticatedUser(supabase)
   await ensureUserProfile(user)
 
   const normalizedCode = input.inviteCode.trim().replace(/\s+/g, '').toUpperCase()

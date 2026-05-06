@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import type { User } from '@supabase/supabase-js'
+import { getAuthenticatedUser } from '../../../shared/api/auth'
 import { ensureUserProfile } from '../../../shared/api/profiles'
 import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
-import { useAuthStore } from '../../../shared/stores/authStore'
 import type { Workspace } from '../../../shared/types/contracts'
 import { mapWorkspace, workspaceKeys } from './useWorkspacesQuery'
 
@@ -11,10 +10,8 @@ const STARTER_DOCUMENT_TITLE = 'Welcome to SyncSpace'
 
 export function useCreateWorkspaceMutation() {
   const queryClient = useQueryClient()
-  const user = useAuthStore((state) => state.user)
-
   return useMutation({
-    mutationFn: async (input: { name: string }) => createWorkspace(input, user ?? null),
+    mutationFn: createWorkspace,
     onSuccess: (workspace) => {
       queryClient.setQueryData<Workspace[]>(workspaceKeys.lists(), (current = []) => {
         if (current.some((item) => item.id === workspace.id)) return current
@@ -27,12 +24,11 @@ export function useCreateWorkspaceMutation() {
   })
 }
 
-async function createWorkspace(input: { name: string }, user: User | null): Promise<Workspace> {
-  if (!user) throw new Error('로그인이 필요합니다.')
-
+async function createWorkspace(input: { name: string }): Promise<Workspace> {
+  const supabase = requireSupabaseClient()
+  const user = await getAuthenticatedUser(supabase)
   await ensureUserProfile(user)
 
-  const supabase = requireSupabaseClient()
   const { data, error } = await supabase
     .from('workspaces')
     .insert({ name: input.name, owner_id: user.id })

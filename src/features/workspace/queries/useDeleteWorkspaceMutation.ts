@@ -1,15 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { getAuthenticatedUser } from '../../../shared/api/auth'
 import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
-import { useAuthStore } from '../../../shared/stores/authStore'
 import type { Workspace } from '../../../shared/types/contracts'
 import { workspaceKeys } from './useWorkspacesQuery'
 
 export function useDeleteWorkspaceMutation() {
   const queryClient = useQueryClient()
-  const userId = useAuthStore((state) => state.user?.id)
-
   return useMutation({
-    mutationFn: (input: { workspaceId: string }) => deleteWorkspace(input, userId ?? null),
+    mutationFn: deleteWorkspace,
     onSuccess: (workspaceId) => {
       queryClient.setQueryData<Workspace[]>(workspaceKeys.lists(), (current = []) =>
         current.filter((workspace) => workspace.id !== workspaceId)
@@ -19,15 +17,14 @@ export function useDeleteWorkspaceMutation() {
   })
 }
 
-async function deleteWorkspace(input: { workspaceId: string }, userId: string | null): Promise<string> {
-  if (!userId) throw new Error('로그인이 필요합니다.')
-
+async function deleteWorkspace(input: { workspaceId: string }): Promise<string> {
   const supabase = requireSupabaseClient()
+  const user = await getAuthenticatedUser(supabase)
   const { data, error } = await supabase
     .from('workspaces')
     .delete()
     .eq('id', input.workspaceId)
-    .eq('owner_id', userId)
+    .eq('owner_id', user.id)
     .select('id')
     .maybeSingle()
 

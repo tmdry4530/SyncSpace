@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { WebsocketProvider } from 'y-websocket'
 import * as Y from 'yjs'
 import { useAuthStore } from '../../shared/stores/authStore'
-import { readClientEnv } from '../../shared/types/env'
 
 export function useYProvider(serverUrl: string | null | undefined, roomName: string | null | undefined, doc: Y.Doc | null) {
   const token = useAuthStore((state) => state.session?.access_token)
-  const wsAuthMode = readClientEnv().wsAuthMode
   const [provider, setProvider] = useState<WebsocketProvider | null>(null)
 
   useEffect(() => {
@@ -17,7 +15,10 @@ export function useYProvider(serverUrl: string | null | undefined, roomName: str
 
     const nextProvider = new WebsocketProvider(serverUrl, roomName, doc, {
       connect: false,
-      protocols: wsAuthMode === 'supabase' && token ? ['bearer', token] : [],
+      // Advertising the bearer protocol is safe for the auth-off local backend and
+      // avoids a common deployment drift where the backend requires Supabase auth
+      // but the frontend forgot VITE_WS_AUTH_MODE=supabase.
+      protocols: token ? ['bearer', token] : [],
       // Force every client through the backend room instead of relying on
       // same-browser BroadcastChannel shortcuts, and periodically resync so a
       // missed/backgrounded browser update is recovered without a full reload.
@@ -33,7 +34,7 @@ export function useYProvider(serverUrl: string | null | undefined, roomName: str
       window.clearTimeout(connectTimer)
       destroyProviderWithoutClosingConnectingSocket(nextProvider)
     }
-  }, [doc, roomName, serverUrl, token, wsAuthMode])
+  }, [doc, roomName, serverUrl, token])
 
   return provider
 }

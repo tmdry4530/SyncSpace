@@ -22,7 +22,15 @@ export function WorkspacePage() {
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!name.trim()) return
-    createWorkspace.mutate({ name: name.trim() }, { onSuccess: () => setName('') })
+    createWorkspace.mutate(
+      { name: name.trim() },
+      {
+        onSuccess: (workspace) => {
+          setName('')
+          navigate(routes.workspace(workspace.id))
+        }
+      }
+    )
   }
 
   function handleJoin(event: FormEvent<HTMLFormElement>) {
@@ -33,7 +41,7 @@ export function WorkspacePage() {
       {
         onSuccess: (workspace) => {
           setInviteCode('')
-          navigate(`/w/${workspace.id}`)
+          navigate(routes.workspace(workspace.id))
         }
       }
     )

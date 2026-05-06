@@ -585,8 +585,6 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .inline-create input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
 .inline-create button { min-height: 36px; padding: 0; border-color: transparent; background: var(--accent); color: #fff; border-radius: 6px; }
 .inline-create button:hover { background: var(--accent-2); }
-.sidebar-add-btn { color: #94a3b8; border: none; }
-.sidebar-add-btn:hover { background-color: rgba(255,255,255,0.1); color: #fff; }
 .sidebar .muted { color: #64748b; padding: 0.3rem 0.65rem; }
 .sidebar .form-error { color: #fca5a5; }
 
@@ -1368,6 +1366,32 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   margin-bottom: 0;
 }
 
+.sidebar-section-header .icon-button.small.sidebar-add-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid rgba(16, 185, 129, 0.58);
+  border-radius: 9px;
+  background: rgba(16, 185, 129, 0.16);
+  color: #d1fae5;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-section-header .icon-button.small.sidebar-add-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #022c22;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.22);
+  transform: translateY(-1px);
+}
+
+.sidebar-section-header .icon-button.small.sidebar-add-btn:focus-visible {
+  outline: 2px solid #a7f3d0;
+  outline-offset: 2px;
+}
+
 /* Ralph UI quality fixes */
 .brand-mark {
   color: var(--primary);
@@ -1868,13 +1892,15 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   height: 40px;
   min-height: 40px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.045);
-  color: #94a3b8;
+  border-color: rgba(16, 185, 129, 0.58);
+  background: rgba(16, 185, 129, 0.16);
+  color: #d1fae5;
 }
 
 .sidebar.collapsed .sidebar-add-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #022c22;
 }
 
 .sidebar.collapsed .inline-create,

@@ -5,6 +5,11 @@ import { createRealtimeAuthorizer, type RealtimeAuthorizer } from '../auth/realt
 import { getAccessToken } from '../auth/realtimeAuth.js'
 import { createMessagePersistenceAdapter, type MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import {
+  createWorkspaceCreator,
+  WorkspaceCreateError,
+  type WorkspaceCreator
+} from '../persistence/workspaceCreator.js'
+import {
   createWorkspaceJoiner,
   WorkspaceJoinError,
   type WorkspaceJoiner
@@ -17,6 +22,7 @@ export interface SyncSpaceServerOptions {
   logger?: Logger
   messagePersistence?: MessagePersistenceAdapter
   workspaceJoiner?: WorkspaceJoiner
+  workspaceCreator?: WorkspaceCreator
   authorizer?: RealtimeAuthorizer
 }
 
@@ -33,11 +39,12 @@ export function createSyncSpaceServer(options: SyncSpaceServerOptions = {}): Syn
   const logger = options.logger ?? createLogger(config.logLevel)
   const messagePersistence = options.messagePersistence ?? createMessagePersistenceAdapter(config, logger)
   const workspaceJoiner = options.workspaceJoiner ?? createWorkspaceJoiner(config, logger)
+  const workspaceCreator = options.workspaceCreator ?? createWorkspaceCreator(config, logger)
   const authorizer = options.authorizer ?? createRealtimeAuthorizer(config, logger)
 
   let realtime: RealtimeServerHandle
   const server = createServer((request, response) => {
-    void handleHttpRequest(request, response, () => realtime.stats(), config, workspaceJoiner)
+    void handleHttpRequest(request, response, () => realtime.stats(), config, workspaceJoiner, workspaceCreator)
   })
 
   realtime = setupYWebsocketServer({
@@ -89,7 +96,8 @@ async function handleHttpRequest(
   response: ServerResponse,
   stats: StatsProvider,
   config: ServerConfig,
-  workspaceJoiner: WorkspaceJoiner
+  workspaceJoiner: WorkspaceJoiner,
+  workspaceCreator: WorkspaceCreator
 ): Promise<void> {
   const pathname = getPathname(request.url)
   const headers = corsHeaders(request)
@@ -119,6 +127,11 @@ async function handleHttpRequest(
     return
   }
 
+  if (request.method === 'POST' && pathname === '/api/workspaces') {
+    await handleCreateWorkspaceRequest(request, response, headers, workspaceCreator)
+    return
+  }
+
   if (request.method === 'POST' && pathname === '/api/workspaces/join') {
     await handleJoinWorkspaceRequest(request, response, headers, workspaceJoiner)
     return
@@ -135,6 +148,32 @@ function getPathname(rawUrl: string | undefined): string {
     return new URL(rawUrl ?? '/', 'http://syncspace.local').pathname
   } catch {
     return '/'
+  }
+}
+
+async function handleCreateWorkspaceRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  headers: Record<string, string>,
+  workspaceCreator: WorkspaceCreator
+): Promise<void> {
+  try {
+    const token = getAccessToken(request)
+    if (!token) {
+      writeJson(response, 401, { code: 'missing_access_token', message: '로그인이 필요합니다.' }, headers)
+      return
+    }
+
+    const body = await readJsonBody(request)
+    const name = typeof body.name === 'string' ? body.name : ''
+    const workspace = await workspaceCreator.createWorkspace({ name, accessToken: token })
+    writeJson(response, 200, { workspace }, headers)
+  } catch (error) {
+    if (error instanceof WorkspaceCreateError) {
+      writeJson(response, error.statusCode, { code: error.code, message: error.message }, headers)
+      return
+    }
+    writeJson(response, 500, { code: 'internal_error', message: '서버 요청 처리 중 문제가 발생했습니다.' }, headers)
   }
 }
 

@@ -418,19 +418,27 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .workspace-tile {
   min-height: 68px;
   display: grid;
-  grid-template-columns: 48px 1fr auto auto;
-  align-items: center;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  padding: 0.85rem 1rem;
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
   transition: transform 130ms ease, border-color 130ms ease, box-shadow 130ms ease;
 }
-.workspace-tile:hover { transform: translateY(-1px); border-color: var(--primary); box-shadow: 0 8px 22px rgba(15,23,42,0.08); }
-.workspace-tile span {
+.workspace-tile:hover,
+.workspace-tile:focus-within { transform: translateY(-1px); border-color: var(--primary); box-shadow: 0 8px 22px rgba(15,23,42,0.08); }
+.workspace-tile-link {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+}
+.workspace-tile-link span {
   width: 48px;
   height: 48px;
   display: grid;
@@ -441,10 +449,27 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   font-weight: 800;
   letter-spacing: -0.03em;
 }
-.workspace-tile:nth-child(2n) span { background: var(--accent-soft); color: #064e3b; }
-.workspace-tile strong { font-size: 0.95rem; }
-.workspace-tile small { color: var(--muted); justify-self: end; }
-.workspace-tile em { color: var(--muted); font-style: normal; font-size: 1.2rem; }
+.workspace-tile:nth-child(2n) .workspace-tile-link span { background: var(--accent-soft); color: #064e3b; }
+.workspace-tile-link strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
+.workspace-tile-link small { color: var(--muted); justify-self: end; }
+.workspace-tile-link em { color: var(--muted); font-style: normal; font-size: 1.2rem; }
+.workspace-delete-button {
+  align-self: stretch;
+  min-height: 100%;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  padding: 0 0.85rem;
+  background: #fff7f7;
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.workspace-delete-button:hover {
+  background: #fee2e2;
+  color: #7f1d1d;
+  box-shadow: none;
+}
 .empty-workspace-panel {
   min-height: 12rem;
   display: grid;
@@ -1061,8 +1086,10 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   .preview-frame aside { display: none; }
   .preview-frame article { border-right: 0; }
   .workspace-index-user span { display: none; }
-  .workspace-tile { grid-template-columns: 44px 1fr auto; }
-  .workspace-tile small { grid-column: 2 / -1; justify-self: start; }
+  .workspace-tile { grid-template-columns: 1fr; }
+  .workspace-tile-link { grid-template-columns: 44px 1fr auto; }
+  .workspace-tile-link small { grid-column: 2 / -1; justify-self: start; }
+  .workspace-delete-button { min-height: 42px; border-left: 0; border-top: 1px solid var(--line); }
   .create-card, .message-composer { grid-template-columns: 1fr; }
   .auth-page, .contract-page { padding: 1rem; }
 }

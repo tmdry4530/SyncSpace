@@ -1,8 +1,10 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
 import { routes } from '../../app/router/routes'
 import { useCreateWorkspaceMutation } from '../../features/workspace/queries/useCreateWorkspaceMutation'
 import { useJoinWorkspaceMutation } from '../../features/workspace/queries/useJoinWorkspaceMutation'
+import { useDeleteWorkspaceMutation } from '../../features/workspace/queries/useDeleteWorkspaceMutation'
 import { useWorkspacesQuery } from '../../features/workspace/queries/useWorkspacesQuery'
 import { getSupabaseClient } from '../../shared/api/supabaseClient'
 import { toAppError } from '../../shared/api/errors'
@@ -16,6 +18,7 @@ export function WorkspacePage() {
   const { data: workspaces = [], isLoading, error } = useWorkspacesQuery()
   const createWorkspace = useCreateWorkspaceMutation()
   const joinWorkspace = useJoinWorkspaceMutation()
+  const deleteWorkspace = useDeleteWorkspaceMutation()
   const [name, setName] = useState('SyncSpace Demo')
   const [inviteCode, setInviteCode] = useState('')
 
@@ -51,9 +54,18 @@ export function WorkspacePage() {
     await getSupabaseClient()?.auth.signOut()
   }
 
+  function handleDeleteWorkspace(workspaceId: string, workspaceName: string) {
+    const confirmed = window.confirm(
+      `"${workspaceName}" 워크스페이스를 삭제할까요? 채널, 문서, 메시지가 함께 삭제되며 되돌릴 수 없습니다.`
+    )
+    if (!confirmed) return
+    deleteWorkspace.mutate({ workspaceId })
+  }
+
   const createError = createWorkspace.error ? toAppError(createWorkspace.error).message : null
   const joinError = joinWorkspace.error ? toAppError(joinWorkspace.error).message : null
   const loadError = error ? toAppError(error).message : null
+  const deleteError = deleteWorkspace.error ? toAppError(deleteWorkspace.error).message : null
   const displayName = formatDisplayName(profile?.displayName ?? user?.email)
 
   return (
@@ -102,14 +114,35 @@ export function WorkspacePage() {
           </section>
 
           <div className="workspace-grid" aria-label="워크스페이스 목록">
-            {workspaces.map((workspace) => (
-              <Link className="workspace-tile" key={workspace.id} to={`/w/${workspace.id}`}>
-                <span>{workspace.name.slice(0, 2).toUpperCase()}</span>
-                <strong>{workspace.name}</strong>
-                <small>초대 코드 {workspace.inviteCode}</small>
-                <em aria-hidden="true">→</em>
-              </Link>
-            ))}
+            {deleteError ? <p className="form-error compact" role="alert">워크스페이스 삭제 실패: {deleteError}</p> : null}
+            {workspaces.map((workspace) => {
+              const canDelete = workspace.ownerId === user?.id
+              const isDeleting = deleteWorkspace.isPending && deleteWorkspace.variables?.workspaceId === workspace.id
+
+              return (
+                <article className="workspace-tile" key={workspace.id}>
+                  <Link className="workspace-tile-link" to={routes.workspace(workspace.id)}>
+                    <span>{workspace.name.slice(0, 2).toUpperCase()}</span>
+                    <strong>{workspace.name}</strong>
+                    <small>초대 코드 {workspace.inviteCode}</small>
+                    <em aria-hidden="true">→</em>
+                  </Link>
+                  {canDelete ? (
+                    <button
+                      aria-label={`${workspace.name} 워크스페이스 삭제`}
+                      className="workspace-delete-button"
+                      disabled={isDeleting}
+                      onClick={() => handleDeleteWorkspace(workspace.id, workspace.name)}
+                      title="워크스페이스 삭제"
+                      type="button"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                      {isDeleting ? '삭제 중' : '삭제'}
+                    </button>
+                  ) : null}
+                </article>
+              )
+            })}
             {workspaces.length === 0 && !isLoading ? (
               <div className="empty-workspace-panel">
                 <p className="eyebrow">첫 공간 만들기</p>

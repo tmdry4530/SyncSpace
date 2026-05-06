@@ -10,34 +10,35 @@ export function HomePage() {
           <span>SyncSpace</span>
         </Link>
         <nav aria-label="홈 섹션">
-          <a href="#features">기능</a>
-          <a href="#flow">작업 흐름</a>
-          <Link to={routes.contract}>API</Link>
+          <a href="#features">특징</a>
+          <a href="#flow">사용 방법</a>
+          <a href="#preview">미리보기</a>
         </nav>
         <div className="landing-nav-actions">
           <Link className="button ghost small" to={routes.login}>로그인</Link>
-          <Link className="button primary small" to={routes.login}>시작하기</Link>
+          <Link className="button primary small" to={routes.login}>무료로 시작하기</Link>
         </div>
       </header>
 
       <section className="hero-card">
-        <p className="eyebrow">SYNCHRONOUS FLOW</p>
-        <h1>Chat and Document, Synchronized.</h1>
+        <p className="eyebrow">TEAM WORKSPACE</p>
+        <h1>팀의 대화와 문서를 한 공간에.</h1>
         <p className="hero-copy">
-          채팅과 문서 작업을 분리하지 않고, 한 화면의 집중형 workbench에서 실시간으로 이어가는 협업 공간입니다.
+          SyncSpace는 흩어진 채팅, 회의 메모, 작업 문서를 하나의 워크스페이스로 모아
+          팀이 더 빠르게 정리하고 결정하도록 돕습니다.
         </p>
         <div className="hero-actions">
           <Link className="button primary" to={routes.login}>
-            로그인하고 시작
+            지금 시작하기
           </Link>
-          <Link className="button ghost" to={routes.contract}>API 계약 보기</Link>
+          <a className="button ghost" href="#preview">화면 둘러보기</a>
         </div>
       </section>
 
-      <section className="landing-preview" aria-label="SyncSpace 작업 화면 미리보기">
+      <section className="landing-preview" id="preview" aria-label="SyncSpace 작업 화면 미리보기">
         <div className="preview-topbar">
-          <span>Project Alpha / Product Requirements</span>
-          <span className="status-pill connected">connected</span>
+          <span>마케팅 팀 / 출시 준비</span>
+          <span className="status-pill connected">함께 작업 중</span>
         </div>
         <div className="preview-frame">
           <aside aria-hidden="true">
@@ -46,31 +47,34 @@ export function HomePage() {
             <span />
           </aside>
           <article>
-            <p className="eyebrow">PHASE 1 ARCHITECTURE REVIEW</p>
-            <h2>실시간 협업 상태를 한 곳에서 확인</h2>
-            <p>왼쪽은 대화 흐름, 오른쪽은 공동 문서 편집에 집중합니다. 서버 상태와 CRDT 상태는 명확히 분리됩니다.</p>
+            <p className="eyebrow">TODAY'S NOTE</p>
+            <h2>회의가 끝나기 전에 정리까지 끝냅니다.</h2>
+            <p>
+              왼쪽에서 팀원과 이야기하고, 오른쪽에서 결정 사항과 할 일을 바로 문서로 남깁니다.
+              중요한 맥락이 대화 속에 묻히지 않습니다.
+            </p>
           </article>
           <div className="preview-chat">
-            <strong>Team Chat</strong>
-            <p>API Spec 업데이트 확인했어요.</p>
-            <p>문서 오른쪽에 반영했습니다.</p>
+            <strong>팀 대화</strong>
+            <p>이번 주 출시 범위는 여기까지로 정리할게요.</p>
+            <p>좋아요. 결정 사항을 문서에 바로 적어둘게요.</p>
           </div>
         </div>
       </section>
 
-      <section className="hero-orbit" id="features" aria-label="상태 레이어 요약">
-        <div><strong>Zustand</strong><span>로컬 UI 상태만 가볍게 관리</span></div>
-        <div><strong>TanStack Query</strong><span>서버 캐시와 무효화 담당</span></div>
-        <div><strong>Yjs</strong><span>채팅, 에디터, presence 동기화</span></div>
+      <section className="hero-orbit" id="features" aria-label="SyncSpace 주요 특징">
+        <div><strong>한눈에 보기</strong><span>대화, 문서, 팀원이 같은 화면에 모여 있어 흐름을 놓치지 않습니다.</span></div>
+        <div><strong>바로 정리하기</strong><span>회의 중 나온 결정과 할 일을 즉시 문서로 남길 수 있습니다.</span></div>
+        <div><strong>함께 이어가기</strong><span>팀원이 같은 공간에서 확인하고 다음 작업을 자연스럽게 이어갑니다.</span></div>
       </section>
 
-      <section className="flow-section" id="flow" aria-label="SyncSpace 작업 흐름">
-        <p className="eyebrow">FLOW</p>
-        <h2>대화에서 결정하고, 같은 화면에서 바로 문서화합니다.</h2>
+      <section className="flow-section" id="flow" aria-label="SyncSpace 사용 방법">
+        <p className="eyebrow">HOW IT WORKS</p>
+        <h2>복잡한 설정 없이, 팀 공간을 만들고 바로 협업하세요.</h2>
         <ol>
-          <li><strong>채널 선택</strong><span>팀 대화를 열고 맥락을 맞춥니다.</span></li>
-          <li><strong>문서 선택</strong><span>관련 문서를 같은 workbench에 고정합니다.</span></li>
-          <li><strong>실시간 동기화</strong><span>presence, 메시지, 편집 상태를 새로고침 없이 공유합니다.</span></li>
+          <li><strong>공간 만들기</strong><span>프로젝트나 팀 이름으로 새 워크스페이스를 시작합니다.</span></li>
+          <li><strong>초대하고 대화하기</strong><span>팀원을 초대해 필요한 내용을 한곳에서 이야기합니다.</span></li>
+          <li><strong>문서로 남기기</strong><span>결정 사항, 할 일, 회의록을 같은 화면에서 정리합니다.</span></li>
         </ol>
       </section>
     </main>

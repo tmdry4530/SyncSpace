@@ -10,7 +10,7 @@ server/.syncspace-data/
 .vite/
 
 # Repository docs are local-only
-docs/
+
 
 # Markdown documentation/drafts: keep root README only
 *.md

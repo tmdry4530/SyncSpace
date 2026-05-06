@@ -61,7 +61,12 @@ export class SupabaseWorkspaceCreator implements WorkspaceCreator {
     }
 
     const workspace = mapWorkspaceRow(workspaceResult.data)
-    await this.createStarterItems({ workspaceId: workspace.id, userId: user.id })
+    try {
+      await this.createStarterItems({ workspaceId: workspace.id, userId: user.id })
+    } catch (error) {
+      await this.rollbackWorkspace(workspace.id)
+      throw error
+    }
     return workspace
   }
 
@@ -92,6 +97,13 @@ export class SupabaseWorkspaceCreator implements WorkspaceCreator {
     if (result.error) {
       this.logger.warn('Failed to ensure profile before workspace create', { userId: user.id, error: result.error.message })
       throw new WorkspaceCreateError(500, 'profile_sync_failed', '사용자 프로필을 준비하지 못했습니다.')
+    }
+  }
+
+  private async rollbackWorkspace(workspaceId: string): Promise<void> {
+    const result = await this.client.from('workspaces').delete().eq('id', workspaceId)
+    if (result.error) {
+      this.logger.warn('Failed to roll back workspace after starter item failure', { workspaceId, error: result.error.message })
     }
   }
 

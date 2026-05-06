@@ -4,16 +4,27 @@ import { readClientEnv } from '../types/env'
 import { useAuthStore } from '../stores/authStore'
 
 export async function postBackendJson<TResponse>(path: string, body: unknown): Promise<TResponse> {
+  return requestBackendJson<TResponse>(path, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  })
+}
+
+export async function deleteBackendJson<TResponse>(path: string): Promise<TResponse> {
+  return requestBackendJson<TResponse>(path, { method: 'DELETE' })
+}
+
+async function requestBackendJson<TResponse>(path: string, init: RequestInit): Promise<TResponse> {
   const token = await readAccessToken()
   if (!token) throw new Error('로그인이 필요합니다.')
 
   const response = await fetch(`${readClientEnv().apiUrl}${path}`, {
-    method: 'POST',
+    ...init,
     headers: {
       authorization: `Bearer ${token}`,
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(body)
+      'content-type': 'application/json',
+      ...init.headers
+    }
   })
 
   const payload = (await response.json().catch(() => null)) as unknown

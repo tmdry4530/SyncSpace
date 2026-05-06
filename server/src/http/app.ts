@@ -5,6 +5,11 @@ import { createRealtimeAuthorizer, type RealtimeAuthorizer } from '../auth/realt
 import { getAccessToken } from '../auth/realtimeAuth.js'
 import { createMessagePersistenceAdapter, type MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import {
+  createWorkspaceDeleter,
+  WorkspaceDeleteError,
+  type WorkspaceDeleter
+} from '../persistence/workspaceDeleter.js'
+import {
   createWorkspaceCreator,
   WorkspaceCreateError,
   type WorkspaceCreator
@@ -23,6 +28,7 @@ export interface SyncSpaceServerOptions {
   messagePersistence?: MessagePersistenceAdapter
   workspaceJoiner?: WorkspaceJoiner
   workspaceCreator?: WorkspaceCreator
+  workspaceDeleter?: WorkspaceDeleter
   authorizer?: RealtimeAuthorizer
 }
 
@@ -40,11 +46,12 @@ export function createSyncSpaceServer(options: SyncSpaceServerOptions = {}): Syn
   const messagePersistence = options.messagePersistence ?? createMessagePersistenceAdapter(config, logger)
   const workspaceJoiner = options.workspaceJoiner ?? createWorkspaceJoiner(config, logger)
   const workspaceCreator = options.workspaceCreator ?? createWorkspaceCreator(config, logger)
+  const workspaceDeleter = options.workspaceDeleter ?? createWorkspaceDeleter(config, logger)
   const authorizer = options.authorizer ?? createRealtimeAuthorizer(config, logger)
 
   let realtime: RealtimeServerHandle
   const server = createServer((request, response) => {
-    void handleHttpRequest(request, response, () => realtime.stats(), config, workspaceJoiner, workspaceCreator)
+    void handleHttpRequest(request, response, () => realtime.stats(), config, workspaceJoiner, workspaceCreator, workspaceDeleter)
   })
 
   realtime = setupYWebsocketServer({
@@ -97,7 +104,8 @@ async function handleHttpRequest(
   stats: StatsProvider,
   config: ServerConfig,
   workspaceJoiner: WorkspaceJoiner,
-  workspaceCreator: WorkspaceCreator
+  workspaceCreator: WorkspaceCreator,
+  workspaceDeleter: WorkspaceDeleter
 ): Promise<void> {
   const pathname = getPathname(request.url)
   const headers = corsHeaders(request)
@@ -132,6 +140,12 @@ async function handleHttpRequest(
     return
   }
 
+  const workspaceDeleteMatch = matchWorkspaceDeletePath(pathname)
+  if (request.method === 'DELETE' && workspaceDeleteMatch) {
+    await handleDeleteWorkspaceRequest(request, response, headers, workspaceDeleter, workspaceDeleteMatch.workspaceId)
+    return
+  }
+
   if (request.method === 'POST' && pathname === '/api/workspaces/join') {
     await handleJoinWorkspaceRequest(request, response, headers, workspaceJoiner)
     return
@@ -149,6 +163,42 @@ function getPathname(rawUrl: string | undefined): string {
   } catch {
     return '/'
   }
+}
+
+function matchWorkspaceDeletePath(pathname: string): { workspaceId: string } | null {
+  const match = /^\/api\/workspaces\/([^/]+)$/.exec(pathname)
+  return match?.[1] ? { workspaceId: decodePathSegment(match[1]) } : null
+}
+
+function decodePathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}
+
+class HttpRequestError extends Error {
+  constructor(
+    readonly statusCode: number,
+    readonly code: string,
+    message: string
+  ) {
+    super(message)
+    this.name = 'HttpRequestError'
+  }
+}
+
+function writeKnownError(response: ServerResponse, headers: Record<string, string>, error: unknown): boolean {
+  if (error instanceof HttpRequestError) {
+    writeJson(response, error.statusCode, { code: error.code, message: error.message }, headers)
+    return true
+  }
+  if (error instanceof WorkspaceCreateError || error instanceof WorkspaceJoinError || error instanceof WorkspaceDeleteError) {
+    writeJson(response, error.statusCode, { code: error.code, message: error.message }, headers)
+    return true
+  }
+  return false
 }
 
 async function handleCreateWorkspaceRequest(
@@ -169,10 +219,29 @@ async function handleCreateWorkspaceRequest(
     const workspace = await workspaceCreator.createWorkspace({ name, accessToken: token })
     writeJson(response, 200, { workspace }, headers)
   } catch (error) {
-    if (error instanceof WorkspaceCreateError) {
-      writeJson(response, error.statusCode, { code: error.code, message: error.message }, headers)
+    if (writeKnownError(response, headers, error)) return
+    writeJson(response, 500, { code: 'internal_error', message: '서버 요청 처리 중 문제가 발생했습니다.' }, headers)
+  }
+}
+
+async function handleDeleteWorkspaceRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  headers: Record<string, string>,
+  workspaceDeleter: WorkspaceDeleter,
+  workspaceId: string
+): Promise<void> {
+  try {
+    const token = getAccessToken(request)
+    if (!token) {
+      writeJson(response, 401, { code: 'missing_access_token', message: '로그인이 필요합니다.' }, headers)
       return
     }
+
+    const deletedWorkspaceId = await workspaceDeleter.deleteWorkspace({ workspaceId, accessToken: token })
+    writeJson(response, 200, { workspaceId: deletedWorkspaceId }, headers)
+  } catch (error) {
+    if (writeKnownError(response, headers, error)) return
     writeJson(response, 500, { code: 'internal_error', message: '서버 요청 처리 중 문제가 발생했습니다.' }, headers)
   }
 }
@@ -195,10 +264,7 @@ async function handleJoinWorkspaceRequest(
     const workspace = await workspaceJoiner.joinByInviteCode({ inviteCode, accessToken: token })
     writeJson(response, 200, { workspace }, headers)
   } catch (error) {
-    if (error instanceof WorkspaceJoinError) {
-      writeJson(response, error.statusCode, { code: error.code, message: error.message }, headers)
-      return
-    }
+    if (writeKnownError(response, headers, error)) return
     writeJson(response, 500, { code: 'internal_error', message: '서버 요청 처리 중 문제가 발생했습니다.' }, headers)
   }
 }
@@ -210,7 +276,7 @@ function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>
     request.on('data', (chunk: string) => {
       body += chunk
       if (body.length > 64 * 1024) {
-        reject(new WorkspaceJoinError(413, 'payload_too_large', '요청 본문이 너무 큽니다.'))
+        reject(new HttpRequestError(413, 'payload_too_large', '요청 본문이 너무 큽니다.'))
         request.destroy()
       }
     })
@@ -223,7 +289,7 @@ function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>
         const parsed = JSON.parse(body)
         resolve(typeof parsed === 'object' && parsed !== null ? parsed : {})
       } catch {
-        reject(new WorkspaceJoinError(400, 'invalid_json', 'JSON 요청 본문이 올바르지 않습니다.'))
+        reject(new HttpRequestError(400, 'invalid_json', 'JSON 요청 본문이 올바르지 않습니다.'))
       }
     })
     request.on('error', reject)
@@ -242,7 +308,7 @@ function corsHeaders(request: IncomingMessage): Record<string, string> {
   const origin = request.headers.origin
   return {
     ...(origin ? { 'access-control-allow-origin': origin } : {}),
-    'access-control-allow-methods': 'GET,POST,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
     'access-control-allow-headers': 'content-type,authorization'
   }
 }

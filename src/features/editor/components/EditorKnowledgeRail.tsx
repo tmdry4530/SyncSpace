@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { Editor } from '@tiptap/react'
 import { FileText, Hash, ListTree, Link2 } from 'lucide-react'
 import { routes } from '../../../app/router/routes'
 import type { DocumentMeta } from '../../../shared/types/contracts'
+import { useWorkspaceUiStore } from '../../../shared/stores/workspaceUiStore'
 import { getEditorInsights } from '../utils/editorInsights'
 
 interface EditorKnowledgeRailProps {
@@ -12,6 +14,7 @@ interface EditorKnowledgeRailProps {
 }
 
 export function EditorKnowledgeRail({ editor, workspaceId, documents = [] }: EditorKnowledgeRailProps) {
+  const activeChannelId = useWorkspaceUiStore((state) => state.currentChannelId)
   const revision = useEditorRevision(editor)
   const insights = useMemo(() => getEditorInsights(editor, documents), [documents, editor, revision])
 
@@ -65,10 +68,10 @@ export function EditorKnowledgeRail({ editor, workspaceId, documents = [] }: Edi
           <div className="editor-link-list">
             {insights.wikiLinks.map((link) =>
               link.document ? (
-                <a key={link.label} href={routes.document(workspaceId, link.document.id)}>
+                <Link key={link.label} to={getDocumentLinkTarget(workspaceId, link.document.id, activeChannelId)}>
                   <FileText size={14} />
                   <span>{link.document.title}</span>
-                </a>
+                </Link>
               ) : (
                 <span key={link.label} className="pending-wiki-link">
                   <FileText size={14} />
@@ -100,6 +103,10 @@ export function EditorKnowledgeRail({ editor, workspaceId, documents = [] }: Edi
       </section>
     </aside>
   )
+}
+
+function getDocumentLinkTarget(workspaceId: string, documentId: string, channelId: string | null): string {
+  return channelId ? routes.workbench(workspaceId, channelId, documentId) : routes.document(workspaceId, documentId)
 }
 
 function useEditorRevision(editor: Editor | null): number {

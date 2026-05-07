@@ -5,7 +5,6 @@ import type { ConnectionStatus } from '../../realtime/useConnectionStatus'
 import type { DocumentMeta } from '../../../shared/types/contracts'
 import { useYEditorRoom } from '../realtime/useYEditorRoom'
 import { useCollaborativeEditor } from '../hooks/useCollaborativeEditor'
-import { EditorToolbar } from './EditorToolbar'
 import { EditorKnowledgeRail } from './EditorKnowledgeRail'
 import { filterSlashCommands, SlashCommandMenu, type SlashCommandItem } from './SlashCommandMenu'
 
@@ -185,7 +184,6 @@ export function EditorPanel({
         {hideStatus || isWorkbenchPane ? null : <span className={`status-pill ${status}`}>{status}</span>}
       </header>
       {isWorkbenchPane ? null : <PresenceBar states={realtime.presence} />}
-      <EditorToolbar editor={editor} />
       <div className="editor-workspace">
         <div className="editor-surface" onKeyDownCapture={handleSlashKeyDown}>
           {slashState ? (

@@ -5,7 +5,6 @@ import { ChatPanel } from '../../features/chat/components/ChatPanel'
 import { useChannelsQuery } from '../../features/channel/queries/useChannelsQuery'
 import { EditorPanel } from '../../features/editor/components/EditorPanel'
 import { useDocumentsQuery } from '../../features/documents/queries/useDocumentsQuery'
-import type { ConnectionStatus } from '../../features/realtime/useConnectionStatus'
 import { usePresenceUiStore } from '../../shared/stores/presenceStore'
 import { useWorkspaceUiStore } from '../../shared/stores/workspaceUiStore'
 
@@ -18,8 +17,6 @@ export function WorkspaceSplitPage() {
   const presenceCount = usePresenceUiStore((state) => state.states.length)
   const { data: channels = [], isLoading: channelsLoading } = useChannelsQuery(workspaceId)
   const { data: documents = [], isLoading: documentsLoading } = useDocumentsQuery(workspaceId)
-  const [chatStatus, setChatStatus] = useState<ConnectionStatus>('idle')
-  const [documentStatus, setDocumentStatus] = useState<ConnectionStatus>('idle')
   const [bannerDismissed, setBannerDismissed] = useState(() => readHelpDismissed())
   const [chatWidth, setChatWidth] = useState(40)
   const [isDragging, setIsDragging] = useState(false)
@@ -56,14 +53,6 @@ export function WorkspaceSplitPage() {
   }, [rememberedDocumentId, selectedDocumentId, setDocumentId])
 
   useEffect(() => {
-    if (!selectedChannelId) setChatStatus('idle')
-  }, [selectedChannelId])
-
-  useEffect(() => {
-    if (!selectedDocumentId) setDocumentStatus('idle')
-  }, [selectedDocumentId])
-
-  useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (!isDragging) return
       const container = document.querySelector('.split-workbench')
@@ -88,10 +77,7 @@ export function WorkspaceSplitPage() {
   if (!workspaceId) return <div className="page-state">워크스페이스 경로가 올바르지 않습니다.</div>
 
   const isLoading = channelsLoading || documentsLoading
-  const unifiedStatus = mergeConnectionStatuses([
-    ...(selectedChannelId ? [chatStatus] : []),
-    ...(selectedDocumentId ? [documentStatus] : [])
-  ])
+  const unifiedStatus = getWorkspaceRealtimeStatus(isLoading)
   const statusLabel = getConnectionStatusLabel(unifiedStatus)
 
   function dismissWorkbenchHelp() {
@@ -155,7 +141,6 @@ export function WorkspaceSplitPage() {
               channelName={selectedChannel?.name}
               hideStatus
               variant="workbench"
-              onStatusChange={setChatStatus}
             />
           ) : (
             <EmptySplitPane title="채널이 없습니다" copy="왼쪽 사이드바에서 첫 채널을 만들면 이곳에서 바로 대화할 수 있습니다." loading={isLoading} />
@@ -180,7 +165,6 @@ export function WorkspaceSplitPage() {
               documents={documents}
               hideStatus
               variant="workbench"
-              onStatusChange={setDocumentStatus}
             />
           ) : (
             <EmptySplitPane title="문서가 없습니다" copy="왼쪽 사이드바에서 첫 문서를 만들면 이곳에서 바로 공동 편집할 수 있습니다." loading={isLoading} />
@@ -191,15 +175,14 @@ export function WorkspaceSplitPage() {
   )
 }
 
-function mergeConnectionStatuses(statuses: ConnectionStatus[]): ConnectionStatus {
-  if (statuses.length === 0) return 'idle'
-  if (statuses.some((status) => status === 'disconnected')) return 'disconnected'
-  if (statuses.some((status) => status === 'connecting' || status === 'idle')) return 'connecting'
-  return 'connected'
+type WorkspaceRealtimeStatus = 'idle' | 'connecting' | 'connected' | 'disconnected'
+
+function getWorkspaceRealtimeStatus(isLoading: boolean): WorkspaceRealtimeStatus {
+  return isLoading ? 'connecting' : 'connected'
 }
 
-function getConnectionStatusLabel(status: ConnectionStatus): string {
-  if (status === 'connected') return '실시간 연결'
+function getConnectionStatusLabel(status: WorkspaceRealtimeStatus): string {
+  if (status === 'connected') return '실시간 연결 중'
   if (status === 'connecting') return '연결 중'
   if (status === 'disconnected') return '연결 끊김'
   return '연결 대기'

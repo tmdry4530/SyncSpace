@@ -4,6 +4,7 @@ import { Menu } from 'lucide-react'
 import { routes } from '../../../app/router/routes'
 import { useWorkspaceServerRealtime } from '../../realtime/useServerStateRealtime'
 import { useWorkspaceUiStore } from '../../../shared/stores/workspaceUiStore'
+import { useSidebarStore } from '../../../shared/stores/sidebarStore'
 import { toAppError } from '../../../shared/api/errors'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
 import { Sidebar } from './Sidebar'
@@ -15,6 +16,7 @@ export function WorkspaceShell() {
   const setChannelId = useWorkspaceUiStore((state) => state.setCurrentChannelId)
   const setDocumentId = useWorkspaceUiStore((state) => state.setCurrentDocumentId)
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const isSidebarCollapsed = useSidebarStore((state) => state.isCollapsed)
   const { data: workspaces = [], isLoading, error } = useWorkspacesQuery()
   const workspace = workspaces.find((item) => item.id === workspaceId)
   useWorkspaceServerRealtime(workspaceId)
@@ -39,8 +41,16 @@ export function WorkspaceShell() {
     )
   }
 
+  const shellClassName = [
+    'workspace-shell',
+    isMobileSidebarOpen ? 'mobile-sidebar-open' : null,
+    isSidebarCollapsed ? 'sidebar-collapsed' : null
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={isMobileSidebarOpen ? 'workspace-shell mobile-sidebar-open' : 'workspace-shell'}>
+    <div className={shellClassName}>
       {isMobileSidebarOpen ? (
         <div
           className="mobile-sidebar-backdrop"

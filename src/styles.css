@@ -1435,6 +1435,10 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   outline-offset: 2px;
 }
 
+.sidebar-add-label {
+  display: none;
+}
+
 /* Ralph UI quality fixes */
 .brand-mark {
   color: var(--primary);
@@ -1878,16 +1882,48 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   display: grid;
   justify-items: center;
   gap: 0.42rem;
-  padding: 8px 10px;
+  padding: 10px 10px;
+}
+
+.sidebar.collapsed .sidebar-section--channels,
+.sidebar.collapsed .sidebar-section--documents {
+  border-top: 1px solid rgba(148, 163, 184, 0.13);
 }
 
 .sidebar.collapsed .sidebar-section-header {
   width: 100%;
-  justify-content: center;
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
   margin-bottom: 0.15rem;
 }
 
-.sidebar.collapsed .sidebar-section-header .eyebrow,
+.sidebar.collapsed .sidebar-section-header .eyebrow {
+  position: static;
+  width: auto;
+  height: auto;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  overflow: visible;
+  clip: auto;
+  white-space: nowrap;
+  margin: 0;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #a7f3d0;
+  padding: 0.14rem 0.42rem;
+  font-size: 0.64rem;
+  font-weight: 900;
+}
+
+.sidebar.collapsed .sidebar-section--documents .sidebar-section-header .eyebrow {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(59, 130, 246, 0.13);
+  color: #bfdbfe;
+}
+
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .nav-list .muted {
   position: absolute;
@@ -1907,6 +1943,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   justify-content: center;
   gap: 0;
   padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 12px;
 }
 
@@ -1920,30 +1957,72 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   gap: 0.35rem;
 }
 
+.sidebar.collapsed .sidebar-section--channels .nav-list a svg {
+  color: #86efac;
+}
+
+.sidebar.collapsed .sidebar-section--documents .nav-list a svg {
+  color: #bfdbfe;
+}
+
 .sidebar.collapsed .nav-list a.active {
+  border-color: rgba(16, 185, 129, 0.36);
   background: rgba(16, 185, 129, 0.16);
   color: #d1fae5;
+}
+
+.sidebar.collapsed .sidebar-section--documents .nav-list a.active {
+  border-color: rgba(96, 165, 250, 0.4);
+  background: rgba(59, 130, 246, 0.17);
+  color: #dbeafe;
 }
 
 .sidebar.collapsed .nav-list a.active::before {
   display: none;
 }
 
-.sidebar.collapsed .sidebar-add-btn {
-  width: 44px;
-  min-width: 44px;
-  height: 40px;
-  min-height: 40px;
+.sidebar.collapsed .sidebar-section-header .icon-button.small.sidebar-add-btn {
+  width: 64px;
+  min-width: 64px;
+  height: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
   border-radius: 12px;
   border-color: rgba(16, 185, 129, 0.58);
   background: rgba(16, 185, 129, 0.16);
   color: #d1fae5;
+  font-size: 0.68rem;
+  font-weight: 900;
 }
 
-.sidebar.collapsed .sidebar-add-btn:hover {
+.sidebar.collapsed .sidebar-add-label {
+  display: inline;
+}
+
+.sidebar.collapsed .sidebar-section-header .icon-button.small.sidebar-add-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sidebar.collapsed .sidebar-section--documents .sidebar-section-header .icon-button.small.sidebar-add-btn {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(59, 130, 246, 0.14);
+  color: #dbeafe;
+}
+
+.sidebar.collapsed .sidebar-section-header .icon-button.small.sidebar-add-btn:hover {
   border-color: var(--accent);
   background: var(--accent);
   color: #022c22;
+}
+
+.sidebar.collapsed .sidebar-section--documents .sidebar-section-header .icon-button.small.sidebar-add-btn:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #172554;
 }
 
 .sidebar.collapsed .inline-create,
@@ -2377,5 +2456,47 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   .message-composer button,
   .icon-button-send {
     min-width: 44px;
+  }
+}
+
+/* Keep a collapsed sidebar as a left rail on tablet widths instead of turning it into a wide top bar. */
+@media (max-width: 920px) and (min-width: 561px) {
+  .workspace-shell.sidebar-collapsed {
+    height: 100vh;
+    max-height: 100vh;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .workspace-shell.sidebar-collapsed .sidebar.collapsed {
+    width: 88px;
+    height: 100vh;
+    min-height: 0;
+    max-height: none;
+    border-right: 1px solid var(--nav-line);
+    border-bottom: 0;
+    overflow: hidden;
+  }
+
+  .workspace-shell.sidebar-collapsed .workspace-main {
+    height: 100vh;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 56px minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .workspace-shell.sidebar-collapsed .workspace-header {
+    align-items: center;
+    flex-direction: row;
+    min-height: 56px;
+    padding: 0 18px;
+  }
+
+  .workspace-shell.sidebar-collapsed .workspace-canvas {
+    height: 100%;
+    min-height: 0;
   }
 }

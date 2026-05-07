@@ -105,11 +105,12 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
               <span className="nav-label">워크스페이스</span>
             </Link>
           </div>
-          <div className="sidebar-section">
+          <div className="sidebar-section sidebar-section--channels">
             <div className="sidebar-section-header">
               <p className="eyebrow">채널</p>
-              <button className="icon-button small sidebar-add-btn" onClick={toggleChannelInput} aria-label="채널 추가" type="button">
+              <button className="icon-button small sidebar-add-btn" onClick={toggleChannelInput} aria-label="채널 추가" title="채널 추가" type="button">
                 <Plus size={16} />
+                <span className="sidebar-add-label">채널</span>
               </button>
             </div>
             <ChannelList workspaceId={workspaceId} onNavigate={onMobileClose} />
@@ -123,11 +124,12 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
             )}
             {channelError ? <p className="form-error compact" role="alert">채널 생성 실패: {channelError}</p> : null}
           </div>
-          <div className="sidebar-section">
+          <div className="sidebar-section sidebar-section--documents">
             <div className="sidebar-section-header">
               <p className="eyebrow">문서</p>
-              <button className="icon-button small sidebar-add-btn" onClick={toggleDocumentInput} aria-label="문서 추가" type="button">
+              <button className="icon-button small sidebar-add-btn" onClick={toggleDocumentInput} aria-label="문서 추가" title="문서 추가" type="button">
                 <Plus size={16} />
+                <span className="sidebar-add-label">문서</span>
               </button>
             </div>
             <DocumentList workspaceId={workspaceId} onNavigate={onMobileClose} />

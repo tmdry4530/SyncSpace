@@ -133,7 +133,7 @@ export function WorkspaceSplitPage() {
           role="tab"
           aria-selected={activeMobilePane === 'chat'}
         >
-          채팅 {selectedChannel ? `#${selectedChannel.name}` : ''}
+          채팅
         </button>
         <button
           className={activeMobilePane === 'document' ? 'active' : ''}
@@ -142,7 +142,7 @@ export function WorkspaceSplitPage() {
           role="tab"
           aria-selected={activeMobilePane === 'document'}
         >
-          문서 {selectedDocument?.title ?? ''}
+          문서
         </button>
       </div>
 
@@ -154,6 +154,7 @@ export function WorkspaceSplitPage() {
               channelId={selectedChannelId}
               channelName={selectedChannel?.name}
               hideStatus
+              variant="workbench"
               onStatusChange={setChatStatus}
             />
           ) : (
@@ -178,6 +179,7 @@ export function WorkspaceSplitPage() {
               documentTitle={selectedDocument?.title}
               documents={documents}
               hideStatus
+              variant="workbench"
               onStatusChange={setDocumentStatus}
             />
           ) : (

@@ -12,10 +12,19 @@ interface ChatPanelProps {
   channelId: string
   channelName?: string | undefined
   hideStatus?: boolean
+  variant?: 'default' | 'workbench'
   onStatusChange?: (status: ConnectionStatus) => void
 }
 
-export function ChatPanel({ workspaceId, channelId, channelName, hideStatus = false, onStatusChange }: ChatPanelProps) {
+export function ChatPanel({
+  workspaceId,
+  channelId,
+  channelName,
+  hideStatus = false,
+  variant = 'default',
+  onStatusChange
+}: ChatPanelProps) {
+  const isWorkbenchPane = variant === 'workbench'
   useChannelMessagesRealtime(channelId)
   const historyQuery = useMessagesInfiniteQuery(channelId)
   const realtime = useYChatRoom(workspaceId, channelId)
@@ -34,13 +43,13 @@ export function ChatPanel({ workspaceId, channelId, channelName, hideStatus = fa
   }, [historyQuery.data?.pages, realtime.messages])
 
   return (
-    <section className="chat-panel">
-      <header className="panel-title">
+    <section className={`chat-panel ${isWorkbenchPane ? 'chat-panel--workbench' : ''}`}>
+      <header className={`panel-title ${isWorkbenchPane ? 'panel-title--workbench' : ''}`}>
         <div>
-          <p className="eyebrow">채팅</p>
-          <h1>#{channelName ?? channelId.slice(0, 8)}</h1>
+          {isWorkbenchPane ? null : <p className="eyebrow">채팅</p>}
+          <h1>{isWorkbenchPane ? '채팅' : `#${channelName ?? channelId.slice(0, 8)}`}</h1>
         </div>
-        {hideStatus ? null : <span className={`status-pill ${status}`}>{status}</span>}
+        {hideStatus || isWorkbenchPane ? null : <span className={`status-pill ${status}`}>{status}</span>}
       </header>
       <MessageList
         messages={messages}

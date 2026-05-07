@@ -25,10 +25,20 @@ interface EditorPanelProps {
   documentTitle?: string | undefined
   documents?: DocumentMeta[]
   hideStatus?: boolean
+  variant?: 'default' | 'workbench'
   onStatusChange?: (status: ConnectionStatus) => void
 }
 
-export function EditorPanel({ workspaceId, documentId, documentTitle, documents = [], hideStatus = false, onStatusChange }: EditorPanelProps) {
+export function EditorPanel({
+  workspaceId,
+  documentId,
+  documentTitle,
+  documents = [],
+  hideStatus = false,
+  variant = 'default',
+  onStatusChange
+}: EditorPanelProps) {
+  const isWorkbenchPane = variant === 'workbench'
   const realtime = useYEditorRoom(workspaceId, documentId)
   const editor = useCollaborativeEditor(realtime.doc)
   const status = realtime.status === 'disconnected' && realtime.presence.length > 0 ? 'connected' : realtime.status
@@ -165,16 +175,16 @@ export function EditorPanel({ workspaceId, documentId, documentTitle, documents 
   )
 
   return (
-    <section className="editor-panel">
-      <header className="panel-title">
+    <section className={`editor-panel ${isWorkbenchPane ? 'editor-panel--workbench' : ''}`}>
+      <header className={`panel-title ${isWorkbenchPane ? 'panel-title--workbench' : ''}`}>
         <div>
-          <p className="eyebrow">문서</p>
-          <h1>{documentTitle ?? `문서 ${documentId.slice(0, 8)}`}</h1>
-          <p className="editor-mode-hint">/ 명령 · [[문서링크]] · #태그</p>
+          {isWorkbenchPane ? null : <p className="eyebrow">문서</p>}
+          <h1>{isWorkbenchPane ? '문서' : documentTitle ?? `문서 ${documentId.slice(0, 8)}`}</h1>
+          {isWorkbenchPane ? null : <p className="editor-mode-hint">/ 명령 · [[문서링크]] · #태그</p>}
         </div>
-        {hideStatus ? null : <span className={`status-pill ${status}`}>{status}</span>}
+        {hideStatus || isWorkbenchPane ? null : <span className={`status-pill ${status}`}>{status}</span>}
       </header>
-      <PresenceBar states={realtime.presence} />
+      {isWorkbenchPane ? null : <PresenceBar states={realtime.presence} />}
       <EditorToolbar editor={editor} />
       <div className="editor-workspace">
         <div className="editor-surface" onKeyDownCapture={handleSlashKeyDown}>

@@ -740,8 +740,11 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   grid-template-rows: auto 1fr auto;
 }
 .editor-panel { grid-template-rows: auto auto auto minmax(0, 1fr); }
+.editor-panel--workbench { grid-template-rows: auto auto minmax(0, 1fr); }
 .panel-title { min-height: 56px; padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface); }
+.panel-title--workbench { min-height: 56px; padding-block: 0; }
 .panel-title h1 { font-size: 1.08rem; }
+.panel-title--workbench h1 { font-size: 0.95rem; letter-spacing: -0.03em; }
 .editor-mode-hint { margin: 0.28rem 0 0; color: var(--muted); font-size: 0.74rem; font-weight: 600; letter-spacing: -0.01em; }
 .status-pill {
   display: inline-flex;

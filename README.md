@@ -7,6 +7,7 @@
 ## 배포 주소
 
 - **Vercel**: https://sync-space-green.vercel.app/
+초대코드 : 88A4808D2D
 
 ## 기획 의도
 
@@ -174,6 +175,4 @@ pnpm verify:backend
 pnpm verify:all
 ```
 
-## 라이선스
 
-Portfolio project.

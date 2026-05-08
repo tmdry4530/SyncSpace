@@ -1,95 +1,148 @@
 # SyncSpace
 
-> 채팅에서 결정하고, 같은 워크스페이스의 문서에 바로 정리하는 실시간 협업 워크벤치
+> React 기반 실시간 협업 워크벤치
 
-SyncSpace는 채널 채팅과 공동 문서 편집을 하나의 화면에 묶은 React 프로젝트입니다. 핵심은 채팅과 문서를 오가며 맥락을 잃지 않도록 **Split Workbench**를 만들고, 상태를 성격에 맞게 분리한 것입니다.
+채팅에서 나온 결정사항을 같은 워크스페이스의 문서에 바로 정리하는 협업 앱입니다. 채널 채팅과 공동 문서 편집을 하나의 화면에 배치하고, UI 상태·서버 상태·실시간 협업 상태를 분리해서 구현했습니다.
 
-- **Zustand**: 사이드바, 현재 채널/문서, 입력 draft 같은 UI 상태
-- **TanStack Query**: 워크스페이스, 채널, 문서, 메시지 히스토리 같은 서버 상태
-- **Yjs + y-websocket**: 채팅, 문서 공동 편집, presence 같은 실시간 협업 상태
-- **Supabase**: Auth, Postgres, RLS, 서버 상태 realtime invalidation
+## 배포 주소
 
-## Live
+- **Vercel**: https://sync-space-green.vercel.app/
 
-- App: https://sync-space-green.vercel.app/
+## 기획 의도
 
-## 주요 기능
+대부분의 협업 흐름은 채팅에서 논의하고, 결정된 내용을 다시 문서로 옮기는 식으로 분리됩니다. 이 과정에서 맥락이 끊기거나 정리가 누락될 수 있습니다.
 
-- 채팅과 문서를 한 화면에 배치한 **Split Workbench**
-- 워크스페이스 안에서 채널/문서를 함께 유지하는 URL 구조
-- Yjs 기반 실시간 채팅과 Tiptap 공동 문서 편집
-- `[[문서명]]`, `#태그`, `/` 명령을 활용한 문서 작성 흐름
-- 문서 링크 클릭 시 전체 reload 없이 workbench 안에서 문서 전환
-- 접힘/펼침, tablet rail, mobile drawer를 지원하는 반응형 사이드바
+SyncSpace는 채팅과 문서를 같은 작업 화면에 두어, 대화 중 나온 내용을 바로 문서화할 수 있는 workbench를 목표로 만들었습니다.
+
+## 핵심 기능
+
+### Workbench
+
+- 채팅 패널과 문서 패널을 한 화면에 배치
+- 상단 command bar에서 현재 채널, 현재 문서, 실시간 상태를 요약
+- 패널 내부는 `채팅`, `문서` 역할만 표시해 정보 중복 제거
+
+### Workspace Navigation
+
+- 워크스페이스 안에서 채널과 문서를 동시에 선택
+- URL에 `workspaceId`, `channelId`, `documentId`를 담아 새로고침 후에도 맥락 복원
+- 사이드바 접힘, tablet rail, mobile drawer 지원
+
+### Realtime Collaboration
+
+- Yjs 기반 채팅 room과 문서 room 분리
+- Tiptap Collaboration으로 공동 문서 편집
+- Supabase Realtime + polling fallback으로 서버 목록 변경 반영
+
+### Document Writing
+
+- `/` 슬래시 명령으로 제목, 목록, 인용, 코드, 구분선 입력
+- `[[문서명]]` 문법으로 같은 워크스페이스 문서 링크 연결
+- `#태그`와 제목을 분석해 knowledge rail에 표시
+- 내부 문서 이동은 React Router `Link`로 처리해 전체 reload 방지
 
 ## 기술 스택
 
-| 영역 | 기술 |
+| 구분 | 기술 |
 | --- | --- |
 | Frontend | React 19, TypeScript, Vite 8 |
 | Routing | React Router 7 |
-| State | Zustand, TanStack Query |
+| UI State | Zustand |
+| Server State | TanStack Query |
 | Realtime | Yjs, y-websocket |
 | Editor | Tiptap StarterKit, Placeholder, Collaboration |
-| Backend | Node.js HTTP/WebSocket server, TypeScript |
+| Backend | Node.js HTTP/WebSocket server |
 | Database/Auth | Supabase Auth, Postgres, RLS |
+| Deploy | Vercel, Railway, Supabase |
 
-## 구조 요약
+## 아키텍처
 
 ```txt
-src/
-├─ app/          # providers, router, protected routes
-├─ pages/        # route-level pages
-├─ features/     # workspace, chat, editor, realtime 등 기능 단위 코드
-└─ shared/       # api client, Zustand store, type, util
-
-server/src/
-├─ http/         # health, ready, workspace API
-├─ realtime/     # Yjs websocket setup
-├─ persistence/  # Supabase 기반 저장/관리 로직
-└─ auth/         # websocket 인증과 workspace membership 확인
-
-supabase/
-├─ schema.sql
-├─ rls.sql
-└─ seed.sql
+┌───────────────────────────────────────────────────────────┐
+│                        React App                          │
+├───────────────────────────────────────────────────────────┤
+│  WorkspaceShell                                           │
+│  ├─ Sidebar        워크스페이스/채널/문서 이동              │
+│  ├─ CommandBar     현재 채널·문서·실시간 상태 요약          │
+│  └─ SplitWorkbench                                        │
+│     ├─ ChatPanel   메시지 히스토리 + Yjs chat room          │
+│     └─ EditorPanel Tiptap + Yjs document room              │
+├───────────────────────┬───────────────────────────────────┤
+│ Zustand               │ TanStack Query                     │
+│ UI 상태               │ 서버 목록/메시지 캐시               │
+├───────────────────────┴───────────────────────────────────┤
+│ Yjs / y-websocket    실시간 채팅·문서·presence 동기화        │
+├───────────────────────────────────────────────────────────┤
+│ Node Backend          HTTP API + WebSocket upgrade          │
+├───────────────────────────────────────────────────────────┤
+│ Supabase              Auth + Postgres + RLS + Realtime      │
+└───────────────────────────────────────────────────────────┘
 ```
 
-## 핵심 설계
+### Workbench 흐름
 
-### 1. 한 화면에서 대화와 문서화
+1. 사용자가 워크스페이스에 진입한다.
+2. 사이드바에서 채널과 문서를 선택한다.
+3. URL이 `/w/:workspaceId/ch/:channelId/doc/:documentId` 형태로 갱신된다.
+4. ChatPanel은 `chat:{workspaceId}:{channelId}` room에 연결된다.
+5. EditorPanel은 `doc:{workspaceId}:{documentId}` room에 연결된다.
+6. 사용자는 채팅을 보면서 오른쪽 문서에 바로 정리한다.
 
-워크스페이스 화면은 사이드바, command bar, 채팅 패널, 문서 패널로 구성됩니다. 채널명과 문서명, 접속 상태는 상단 command bar에 모으고, 패널 안에서는 `채팅`, `문서`라는 역할만 보여줍니다.
+## 핵심 구현 포인트
 
-### 2. 상태 책임 분리
+### 1. 상태 책임 분리
 
-서버에서 온 데이터는 TanStack Query가 관리하고, 화면 조작 상태는 Zustand가 관리합니다. 실시간 협업 상태는 Yjs room이 소유합니다. 덕분에 컴포넌트가 서버 캐시, UI 상태, WebSocket 동기화를 한곳에서 모두 처리하지 않습니다.
+모든 상태를 하나의 전역 store에 넣지 않고 성격에 따라 분리했습니다.
 
-### 3. Room 분리
+```txt
+Zustand         sidebar, current channel/document, draft
+TanStack Query  workspaces, channels, documents, messages
+Yjs             chat room, document room, awareness
+```
+
+이 구조 덕분에 컴포넌트가 UI 조작, 서버 캐시, WebSocket 동기화를 한꺼번에 처리하지 않습니다.
+
+### 2. 채널과 문서를 함께 유지하는 라우팅
+
+채널과 문서를 별도 페이지로 완전히 분리하지 않고, workbench route 안에서 함께 유지합니다.
+
+```txt
+/w/:workspaceId/ch/:channelId/doc/:documentId
+```
+
+문서를 바꿔도 채널 맥락이 유지되고, 채널을 바꿔도 현재 문서를 유지할 수 있습니다.
+
+### 3. Chat room / Doc room 분리
 
 ```txt
 chat:{workspaceId}:{channelId}
 doc:{workspaceId}:{documentId}
 ```
 
-채팅과 문서는 데이터 성격이 다르기 때문에 room을 분리했습니다. 다만 사용자에게 보이는 workbench 상단 상태는 개별 room health가 아니라 workspace-level 실시간 작업 가능 상태로 요약합니다.
+채팅은 메시지 중심이고 문서는 편집 문서 상태 중심이기 때문에 room을 분리했습니다. 대신 사용자에게 보이는 workbench 상단 상태는 workspace-level 실시간 작업 가능 상태로 요약합니다.
 
-## 라우팅
+### 4. 문서 링크는 Router Link로 이동
 
-```txt
-/
-/auth/login
-/workspaces
-/w/:workspaceId
-/w/:workspaceId/ch/:channelId
-/w/:workspaceId/doc/:documentId
-/w/:workspaceId/ch/:channelId/doc/:documentId
-/api-contract
+`[[문서명]]`으로 감지된 문서 링크는 일반 `<a href>`가 아니라 React Router `Link`로 이동합니다.
+
+```tsx
+<Link to={routes.workbench(workspaceId, channelId, documentId)}>
+  문서 제목
+</Link>
 ```
 
-내부 이동은 React Router `Link`/`NavLink`를 사용합니다. 특히 문서 링크는 현재 채널이 있으면 workbench route를 유지한 채 문서만 전환합니다.
+이렇게 해서 문서 이동 시 전체 페이지 reload나 불필요한 remount를 피하고, workbench 맥락을 유지합니다.
 
-## 로컬 실행
+### 5. Markdown-first editor
+
+문서 편집은 toolbar보다 Markdown과 shortcut 중심으로 설계했습니다.
+
+- `/` 명령으로 블록 삽입
+- `[[문서명]]`으로 문서 연결
+- `#태그`로 문맥 표시
+- knowledge rail에서 제목, 링크, 태그 요약
+
+## 실행 방법
 
 ```bash
 pnpm install
@@ -112,29 +165,14 @@ VITE_WS_URL=ws://localhost:1234
 
 `SUPABASE_SERVICE_ROLE_KEY`는 backend 전용입니다. `VITE_` 환경 변수에 넣지 않습니다.
 
-## 명령어
+## 검증 명령
 
-| 명령 | 설명 |
-| --- | --- |
-| `pnpm dev` | frontend/backend 동시 실행 |
-| `pnpm dev:frontend` | Vite dev server 실행 |
-| `pnpm dev:backend` | backend watch server 실행 |
-| `pnpm typecheck` | TypeScript 검사 |
-| `pnpm verify:frontend` | frontend typecheck + build |
-| `pnpm verify:backend` | backend lint/typecheck/build |
-| `pnpm verify:all` | 전체 검증 |
-
-## 배포
-
-권장 구조는 다음과 같습니다.
-
-```txt
-Vercel   → React frontend
-Railway  → Node WebSocket backend
-Supabase → Auth, Postgres, RLS, Realtime
+```bash
+pnpm typecheck
+pnpm verify:frontend
+pnpm verify:backend
+pnpm verify:all
 ```
-
-운영 환경에서는 `ALLOWED_ORIGINS`, `WS_AUTH_MODE=supabase`, `VITE_API_URL`, `VITE_WS_URL`, Supabase schema/RLS 적용 여부를 확인해야 합니다.
 
 ## 라이선스
 

@@ -9,12 +9,9 @@ server/dist/
 server/.syncspace-data/
 .vite/
 
-# Repository documentation is tracked under docs/.
-# Keep ad-hoc markdown drafts ignored unless explicitly allowed below.
+# Keep repository Markdown limited to the root README; keep local presentation/docs drafts untracked.
 *.md
 !/README.md
-!/docs/
-!/docs/**/*.md
 # Test scripts and test output
 scripts/verify-*.sh
 scripts/*test*

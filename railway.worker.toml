@@ -1,0 +1,21 @@
+# railway.worker.toml — SyncSpace "agent-worker" service config.
+#
+# 이 파일은 Railway agent-worker 서비스를 위한 설정이다.
+# agent-worker는 A2A task 처리 / push 전송 등 백그라운드 잡을 담당하며
+# HTTP 포트를 열지 않으므로 healthcheck가 없다(restart on failure만).
+# api 서비스와 동일한 빌드를 사용하고 worker 엔트리포인트를 start 한다.
+#
+# 적용 방법 / how to apply:
+#   Railway > agent-worker service > Settings > Config-as-code path = railway.worker.toml
+#
+# 필요한 env: api 서비스와 동일한 DB/Auth env + WORKER_ID, AGENT_WORKER_ENABLED,
+#   PUSH_WORKER_ENABLED. 자세한 목록은 docs/migration/env_inventory.md 참고.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter server build"
+
+[deploy]
+startCommand = "pnpm --filter server worker"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

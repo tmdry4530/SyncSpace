@@ -1,0 +1,25 @@
+# railway.api.toml — SyncSpace "api" service config.
+#
+# 이 파일은 Railway api 서비스(REST + WebSocket + A2A)를 위한 설정이다.
+# Railway service root = repo root. NIXPACKS가 모노레포를 빌드하고
+# `pnpm --filter server build`로 server/dist를 산출한 뒤 server를 start 한다.
+#
+# 적용 방법 / how to apply:
+#   Railway > api service > Settings > Config-as-code path = railway.api.toml
+#
+# 필요한 env (요약): DATABASE_URL, AUTH_SECRET, SESSION_COOKIE_NAME,
+#   SESSION_COOKIE_DOMAIN, AGENT_TOKEN_PEPPER, PUBLIC_APP_URL, A2A_VERSION,
+#   A2A_INTERFACE_URL, A2A_AGENT_CARD_URL, WS_AUTH_MODE, ALLOWED_ORIGINS,
+#   SYNCSPACE_DOC_PERSISTENCE_MODE, LOG_LEVEL, NODE_ENV, HOST, PORT.
+#   자세한 목록은 docs/migration/env_inventory.md 참고.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter server build"
+
+[deploy]
+startCommand = "pnpm --filter server start"
+healthcheckPath = "/ready"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

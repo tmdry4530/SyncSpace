@@ -1,4 +1,5 @@
 import type { AgentProfile, AgentRole, AgentRuntimeStatus } from '../../types/contracts.js'
+import { generateToken, hashToken } from '../../utils/crypto.js'
 import { query, queryOne, withTransaction } from '../query.js'
 import type { Queryable } from '../query.js'
 
@@ -134,6 +135,25 @@ export async function updateAgentStatus(
   client?: Queryable
 ): Promise<void> {
   await query(`update agents set status = $2, updated_at = now() where id = $1`, [agentId, status], client)
+}
+
+/** Mint an agent token, returning the raw secret once. Only the hash is stored. */
+export async function createAgentToken(
+  input: { agentId: string; scopes: string[]; pepper: string | null; expiresAt?: Date },
+  client?: Queryable
+): Promise<{ id: string; token: string }> {
+  const token = generateToken(32)
+  const tokenHash = hashToken(token, input.pepper)
+  const rows = await query<{ id: string }>(
+    `insert into agent_tokens (agent_id, token_hash, scopes, expires_at)
+     values ($1, $2, $3::text[], $4)
+     returning id`,
+    [input.agentId, tokenHash, input.scopes, input.expiresAt ? input.expiresAt.toISOString() : null],
+    client
+  )
+  const id = rows[0]?.id
+  if (!id) throw new Error('Failed to create agent token')
+  return { id, token }
 }
 
 export interface DefaultAgentSpec {

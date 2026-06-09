@@ -13,6 +13,11 @@ import { isHttpError } from './errors.js'
 import { registerHealthRoutes } from './routes/healthRoutes.js'
 import { registerAuthRoutes } from './routes/authRoutes.js'
 import { registerWorkspaceRoutes } from './routes/workspaceRoutes.js'
+import { registerAgentRoutes } from './routes/agentRoutes.js'
+import { A2aStreamingHub } from '../a2a/streaming.js'
+import { createA2aHandler } from '../a2a/routes.js'
+import { getQueueStats } from '../db/repositories/jobRepository.js'
+import { hasDatabaseConfig } from '../config.js'
 
 export interface SyncSpaceServerOptions {
   config?: ServerConfig
@@ -41,17 +46,21 @@ export function createSyncSpaceServer(options: SyncSpaceServerOptions = {}): Syn
   const logger = options.logger ?? createLogger(config.logLevel)
   const messagePersistence = options.messagePersistence ?? createMessagePersistenceAdapter(config, logger)
   const authorizer = options.authorizer ?? createRealtimeAuthorizer(config, logger)
-  const rawHandlers = options.rawHandlers ?? []
+
+  const streamingHub = new A2aStreamingHub(config, logger)
+  const a2aHandler = createA2aHandler({ config, logger, streamingHub })
+  const rawHandlers: RawHttpHandler[] = [a2aHandler, ...(options.rawHandlers ?? [])]
 
   let realtime: RealtimeServerHandle
   const router = new Router()
   registerHealthRoutes(router, {
     config,
     realtimeStats: () => realtime.stats(),
-    ...(options.queueStats ? { queueStats: options.queueStats } : {})
+    queueStats: hasDatabaseConfig(config) ? () => getQueueStats() : undefined
   })
   registerAuthRoutes(router, config)
   registerWorkspaceRoutes(router, config)
+  registerAgentRoutes(router, config)
 
   const server = createServer((request, response) => {
     void dispatch(request, response, router, config, logger, rawHandlers)
@@ -79,6 +88,7 @@ export function createSyncSpaceServer(options: SyncSpaceServerOptions = {}): Syn
         })
       }),
     stop: async () => {
+      await streamingHub.close().catch(() => undefined)
       await realtime.close()
       await new Promise<void>((resolve, reject) => {
         if (!server.listening) {

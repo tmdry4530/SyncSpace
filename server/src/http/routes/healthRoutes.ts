@@ -6,7 +6,7 @@ import { getPool } from '../../db/pool.js'
 export interface HealthDeps {
   config: ServerConfig
   realtimeStats: () => unknown
-  queueStats?: () => { queuedJobs: number; runningJobs: number } | null
+  queueStats?: (() => Promise<{ queuedJobs: number; runningJobs: number }> | { queuedJobs: number; runningJobs: number } | null) | undefined
 }
 
 async function databaseHealthy(config: ServerConfig): Promise<boolean> {
@@ -22,12 +22,16 @@ async function databaseHealthy(config: ServerConfig): Promise<boolean> {
 export function registerHealthRoutes(router: Router, deps: HealthDeps): void {
   router.get('/health', async () => {
     const dbOk = await databaseHealthy(deps.config)
+    let worker: { queuedJobs: number; runningJobs: number } | null = null
+    if (deps.queueStats && dbOk) {
+      worker = await Promise.resolve(deps.queueStats()).catch(() => null)
+    }
     return json({
       ok: true,
       service: 'syncspace-api',
       database: deps.config.databaseUrl ? (dbOk ? 'ok' : 'unavailable') : 'not_configured',
       realtime: deps.realtimeStats(),
-      ...(deps.queueStats ? { worker: deps.queueStats() } : {})
+      ...(worker ? { worker } : {})
     })
   })
 

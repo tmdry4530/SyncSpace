@@ -72,6 +72,8 @@ export async function createTaskFromMessage(input: CreateTaskInput): Promise<Cre
           client
         )
     if (!context) throw new Error('A2A context not found')
+    // Never bind a task to a context from a different workspace.
+    if (context.workspace_id !== input.workspaceId) throw new Error('A2A context not found')
 
     const task = await createTask(
       {
@@ -190,6 +192,38 @@ export async function addAgentMessage(
       client
     )
   })
+}
+
+/** Append a user message to an existing task and re-enqueue processing. */
+export async function sendMessageToExistingTask(
+  taskRow: A2aTaskRow,
+  message: { messageId: string; parts: Part[]; participantId?: string | null; metadata?: Record<string, unknown> }
+): Promise<Task | null> {
+  await withTransaction(async (client) => {
+    const inserted = await insertA2aMessage(
+      {
+        messageId: message.messageId,
+        taskId: taskRow.id,
+        contextId: taskRow.context_id,
+        role: 'ROLE_USER',
+        participantId: message.participantId ?? null,
+        parts: message.parts,
+        ...(message.metadata ? { metadata: message.metadata } : {})
+      },
+      client
+    )
+    await appendEvent(
+      {
+        taskId: taskRow.id,
+        contextId: taskRow.context_id,
+        eventType: 'message',
+        payload: mapMessageRowToA2aMessage(inserted) as unknown as Record<string, unknown>
+      },
+      client
+    )
+    await enqueueJob({ queueName: 'agent', jobType: 'agent_task', payload: { taskId: taskRow.id } }, client)
+  })
+  return assembleTask(taskRow.id)
 }
 
 /** Cancel a task idempotently; returns the (possibly already-terminal) task. */

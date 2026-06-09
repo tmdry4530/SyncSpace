@@ -1,7 +1,8 @@
 import type { ServerConfig } from '../../config.js'
 import type { Router } from '../router.js'
 import { json } from '../response.js'
-import { badRequest, forbidden } from '../errors.js'
+import { badRequest, forbidden, tooManyRequests } from '../errors.js'
+import { RateLimiter } from '../rateLimit.js'
 import { authenticateUser, registerUser, toAuthUser } from '../../auth/appAuth.js'
 import { destroySession, issueSession } from '../../auth/session.js'
 import { optionalSession, requireSession, readSessionToken } from '../../auth/middleware.js'
@@ -12,9 +13,14 @@ function registrationAllowed(config: ServerConfig): boolean {
   return config.nodeEnv !== 'production' || process.env.AUTH_ALLOW_OPEN_REGISTRATION === 'true'
 }
 
+// 10 attempts/min per IP+email for login; 5 registrations/min per IP.
+const loginLimiter = new RateLimiter(60_000, 10)
+const registerLimiter = new RateLimiter(60_000, 5)
+
 export function registerAuthRoutes(router: Router, config: ServerConfig): void {
   router.post('/api/auth/register', async (ctx) => {
     if (!registrationAllowed(config)) throw forbidden('회원가입이 비활성화되어 있습니다.', 'registration_disabled')
+    if (!registerLimiter.check(ctx.ip ?? 'unknown')) throw tooManyRequests('잠시 후 다시 시도해주세요.')
     const body = await ctx.json<{ email?: string; password?: string; displayName?: string; color?: string }>()
     if (!body.email || !body.password) throw badRequest('missing_fields', '이메일과 비밀번호가 필요합니다.')
 
@@ -31,6 +37,9 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
   router.post('/api/auth/login', async (ctx) => {
     const body = await ctx.json<{ email?: string; password?: string }>()
     if (!body.email || !body.password) throw badRequest('missing_fields', '이메일과 비밀번호가 필요합니다.')
+    if (!loginLimiter.check(`${ctx.ip ?? 'unknown'}:${body.email.toLowerCase()}`)) {
+      throw tooManyRequests('로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.')
+    }
 
     const user = await authenticateUser(body.email, body.password)
     const session = await issueSession(config, user.id, { userAgent: ctx.header('user-agent'), ip: ctx.ip })

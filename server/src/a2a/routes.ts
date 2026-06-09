@@ -4,8 +4,9 @@ import type { ServerConfig } from '../config.js'
 import type { Logger } from '../utils/logger.js'
 import type { RawHttpHandler } from '../http/app.js'
 import type { RequestContext } from '../http/context.js'
-import { badRequest, conflict, HttpError, isHttpError, notFound } from '../http/errors.js'
+import { badRequest, conflict, HttpError, isHttpError, notFound, tooManyRequests } from '../http/errors.js'
 import { json, problem, type HttpResponse } from '../http/response.js'
+import { ConcurrencyLimiter, RateLimiter } from '../http/rateLimit.js'
 import { buildExtendedAgentCard, buildPublicAgentCard } from './agentCard.js'
 import { validateA2aVersion } from './version.js'
 import { validateA2aContentType } from './contentType.js'
@@ -39,6 +40,10 @@ export interface A2aHandlerDeps {
 }
 
 const AGENT_CARD_PATH = '/.well-known/agent-card.json'
+
+// 60 task-creating calls/min per IP; max 5 concurrent SSE streams per IP.
+const sendLimiter = new RateLimiter(60_000, 60)
+const streamLimiter = new ConcurrencyLimiter(5)
 
 export function isA2aPath(pathname: string): boolean {
   return pathname === AGENT_CARD_PATH || pathname === '/a2a' || pathname.startsWith('/a2a/')
@@ -150,6 +155,7 @@ interface PreparedSend {
 async function prepareSend(ctx: RequestContext, deps: A2aHandlerDeps): Promise<PreparedSend> {
   validateA2aVersion(ctx, deps.config)
   validateA2aContentType(ctx)
+  if (!sendLimiter.check(ctx.ip ?? 'unknown')) throw tooManyRequests('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.')
   const principal = await requirePrincipal(ctx, deps.config)
   requireScope(principal, 'task:write')
 
@@ -386,6 +392,9 @@ async function streamTaskEvents(
   options: { initialTask?: Task }
 ): Promise<void> {
   const res = ctx.res
+  const acquired = streamLimiter.acquire(ctx.ip ?? 'unknown')
+  if (!acquired) throw tooManyRequests('동시 스트림 제한을 초과했습니다.', 'too_many_streams')
+  const releaseSlot: () => void = acquired
   startSse(res)
 
   let lastSeq = 0
@@ -413,6 +422,7 @@ async function streamTaskEvents(
     closed = true
     clearInterval(heartbeat)
     unsubscribe()
+    releaseSlot()
     res.end()
   }
 
@@ -421,6 +431,7 @@ async function streamTaskEvents(
     closed = true
     clearInterval(heartbeat)
     unsubscribe()
+    releaseSlot()
   })
 
   // For a subscribe (no initialTask) send the current snapshot first.

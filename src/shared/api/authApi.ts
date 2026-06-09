@@ -1,9 +1,13 @@
 import type { AuthUser } from '../types/contracts'
 import { getBackendJson, postBackendJson } from './backendClient'
 
-export async function login(input: { email: string; password: string }): Promise<AuthUser> {
-  const result = await postBackendJson<{ user: AuthUser }>('/api/auth/login', input)
-  return result.user
+export interface AuthSession {
+  user: AuthUser | null
+  participantId: string | null
+}
+
+export async function login(input: { email: string; password: string }): Promise<AuthSession> {
+  return postBackendJson<AuthSession>('/api/auth/login', input)
 }
 
 export async function register(input: {
@@ -11,16 +15,14 @@ export async function register(input: {
   password: string
   displayName?: string
   color?: string
-}): Promise<AuthUser> {
-  const result = await postBackendJson<{ user: AuthUser }>('/api/auth/register', input)
-  return result.user
+}): Promise<AuthSession> {
+  return postBackendJson<AuthSession>('/api/auth/register', input)
 }
 
 export async function logout(): Promise<void> {
   await postBackendJson<{ ok: true }>('/api/auth/logout')
 }
 
-export async function fetchMe(): Promise<AuthUser | null> {
-  const result = await getBackendJson<{ user: AuthUser | null }>('/api/auth/me')
-  return result.user
+export async function fetchMe(): Promise<AuthSession> {
+  return getBackendJson<AuthSession>('/api/auth/me')
 }

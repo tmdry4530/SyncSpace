@@ -8,8 +8,14 @@ import { destroySession, issueSession } from '../../auth/session.js'
 import { optionalSession, requireSession, readSessionToken } from '../../auth/middleware.js'
 import { buildSessionClearCookie, buildSessionSetCookie } from '../../auth/cookies.js'
 import { findUserById, toAuthUser as rowToAuthUser } from '../../db/repositories/userRepository.js'
+import { getHumanParticipantByUserId } from '../../db/repositories/participantRepository.js'
 import { writeAuditLog } from '../../db/repositories/auditRepository.js'
 import { hashIp } from '../../utils/crypto.js'
+
+async function participantIdFor(userId: string): Promise<string | null> {
+  const participant = await getHumanParticipantByUserId(userId)
+  return participant?.id ?? null
+}
 
 function registrationAllowed(config: ServerConfig): boolean {
   return config.nodeEnv !== 'production' || process.env.AUTH_ALLOW_OPEN_REGISTRATION === 'true'
@@ -33,7 +39,9 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
       ...(body.color ? { color: body.color } : {})
     })
     const session = await issueSession(config, userId, { userAgent: ctx.header('user-agent'), ip: ctx.ip })
-    return json({ user }, 200, { 'set-cookie': buildSessionSetCookie(config, session.token, session.expiresAt) })
+    return json({ user, participantId: await participantIdFor(userId) }, 200, {
+      'set-cookie': buildSessionSetCookie(config, session.token, session.expiresAt)
+    })
   })
 
   router.post('/api/auth/login', async (ctx) => {
@@ -64,7 +72,7 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
       ipHash: hashIp(ctx.ip, config.authSecret),
       userAgent: ctx.header('user-agent')
     }).catch(() => undefined)
-    return json({ user: toAuthUser(user) }, 200, {
+    return json({ user: toAuthUser(user), participantId: await participantIdFor(user.id) }, 200, {
       'set-cookie': buildSessionSetCookie(config, session.token, session.expiresAt)
     })
   })
@@ -77,9 +85,9 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
 
   router.get('/api/auth/me', async (ctx) => {
     const session = await optionalSession(ctx, config)
-    if (!session) return json({ user: null }, 200)
+    if (!session) return json({ user: null, participantId: null }, 200)
     const user = await findUserById(session.userId)
-    return json({ user: user ? rowToAuthUser(user) : null }, 200)
+    return json({ user: user ? rowToAuthUser(user) : null, participantId: session.participantId }, 200)
   })
 
   router.post('/api/auth/refresh', async (ctx) => {
@@ -88,7 +96,7 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
     const oldToken = readSessionToken(ctx, config)
     if (oldToken) await destroySession(config, oldToken)
     const user = await findUserById(session.userId)
-    return json({ user: user ? rowToAuthUser(user) : null }, 200, {
+    return json({ user: user ? rowToAuthUser(user) : null, participantId: session.participantId }, 200, {
       'set-cookie': buildSessionSetCookie(config, issued.token, issued.expiresAt)
     })
   })

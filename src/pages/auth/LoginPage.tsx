@@ -10,6 +10,7 @@ export function LoginPage() {
   const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const setUser = useAuthStore((state) => state.setUser)
+  const setParticipantId = useAuthStore((state) => state.setParticipantId)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -32,7 +33,8 @@ export function LoginPage() {
         mode === 'login'
           ? await login({ email, password })
           : await register({ email, password, displayName: email.split('@')[0] ?? email })
-      setUser(account)
+      setUser(account.user)
+      setParticipantId(account.participantId)
       navigate(from, { replace: true })
     } catch (caught) {
       setError(getAuthErrorMessage(toAppError(caught).message))
@@ -61,7 +63,7 @@ export function LoginPage() {
             비밀번호
             <input
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              minLength={6}
+              minLength={8}
               onChange={(event) => setPassword(event.target.value)}
               required
               type="password"

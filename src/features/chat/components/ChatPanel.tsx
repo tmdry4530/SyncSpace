@@ -57,7 +57,7 @@ export function ChatPanel({
         onLoadMore={() => void historyQuery.fetchNextPage()}
         canLoadMore={Boolean(historyQuery.hasNextPage)}
       />
-      <MessageComposer channelId={channelId} onSend={realtime.sendMessage} />
+      <MessageComposer workspaceId={workspaceId} channelId={channelId} onSend={realtime.sendMessage} />
     </section>
   )
 }

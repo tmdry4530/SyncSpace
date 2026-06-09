@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { requireSupabaseClient } from '../../../shared/api/supabaseClient'
+import { getBackendJson } from '../../../shared/api/backendClient'
 import type { Channel } from '../../../shared/types/contracts'
 import { realtimePolling } from '../../realtime/queryPolling'
 import { workspaceKeys } from '../../workspace/queries/useWorkspacesQuery'
@@ -15,23 +15,8 @@ export function useChannelsQuery(workspaceId: string | null | undefined) {
 }
 
 export async function listChannels(workspaceId: string): Promise<Channel[]> {
-  const supabase = requireSupabaseClient()
-  const { data, error } = await supabase
-    .from('channels')
-    .select('id,workspace_id,name,created_by,created_at')
-    .eq('workspace_id', workspaceId)
-    .order('created_at', { ascending: true })
-
-  if (error) throw error
-  return (data ?? []).map(mapChannel)
-}
-
-export function mapChannel(row: Record<string, unknown>): Channel {
-  return {
-    id: String(row.id),
-    workspaceId: String(row.workspace_id),
-    name: String(row.name),
-    createdBy: String(row.created_by),
-    createdAt: String(row.created_at)
-  }
+  const result = await getBackendJson<{ channels: Channel[] }>(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/channels`
+  )
+  return result.channels
 }

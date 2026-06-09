@@ -5,20 +5,26 @@ import { useYAwareness } from '../../realtime/useYAwareness'
 import { useYDoc } from '../../realtime/useYDoc'
 import { useYProvider } from '../../realtime/useYProvider'
 import { useAuthStore } from '../../../shared/stores/authStore'
-import type { ChatMessage, PresenceUser } from '../../../shared/types/contracts'
+import { authUserToPresenceUser, authUserToProfile } from '../../../shared/api/profiles'
+import type { ChatMessage, PresenceUser, UserProfile } from '../../../shared/types/contracts'
 import { getChatRoomName, getChatWsUrl } from '../../../shared/utils/roomNames'
 
 const MESSAGE_ARRAY = 'messages'
 
 export function useYChatRoom(workspaceId: string, channelId: string) {
-  const profile = useAuthStore((state) => state.profile)
-  const user = useMemo<PresenceUser | null>(() => profile, [profile])
+  const authUser = useAuthStore((state) => state.user)
+  const participantId = useAuthStore((state) => state.participantId)
+  const profile = useMemo<UserProfile | null>(() => (authUser ? authUserToProfile(authUser) : null), [authUser])
+  const presenceUser = useMemo<PresenceUser | null>(
+    () => (authUser ? authUserToPresenceUser(authUser) : null),
+    [authUser]
+  )
   const roomName = useMemo(() => getChatRoomName(workspaceId, channelId), [channelId, workspaceId])
   const wsUrl = useMemo(() => getChatWsUrl(workspaceId, channelId), [channelId, workspaceId])
   const doc = useYDoc(roomName)
   const provider = useYProvider(wsUrl, roomName, doc)
   const status = useConnectionStatus(provider)
-  const presence = useYAwareness(provider, user, 'chat')
+  const presence = useYAwareness(provider, presenceUser, 'chat')
   const [messages, setMessages] = useState<ChatMessage[]>([])
 
   useEffect(() => {
@@ -44,6 +50,8 @@ export function useYChatRoom(workspaceId: string, channelId: string) {
         clientId,
         createdAt: now,
         status: status === 'idle' ? 'pending' : 'sent',
+        authorType: 'human',
+        ...(participantId ? { authorParticipantId: participantId } : {}),
         ...(profile ? { user: profile } : {})
       }
     ])

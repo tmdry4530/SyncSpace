@@ -5,6 +5,8 @@ import { ChatPanel } from '../../features/chat/components/ChatPanel'
 import { useChannelsQuery } from '../../features/channel/queries/useChannelsQuery'
 import { EditorPanel } from '../../features/editor/components/EditorPanel'
 import { useDocumentsQuery } from '../../features/documents/queries/useDocumentsQuery'
+import { AgentRail } from '../../features/agents/components/AgentRail'
+import { TaskDetailDrawer } from '../../features/agents/components/TaskDetailDrawer'
 import { usePresenceUiStore } from '../../shared/stores/presenceStore'
 import { useWorkspaceUiStore } from '../../shared/stores/workspaceUiStore'
 
@@ -21,6 +23,7 @@ export function WorkspaceSplitPage() {
   const [chatWidth, setChatWidth] = useState(40)
   const [isDragging, setIsDragging] = useState(false)
   const [activeMobilePane, setActiveMobilePane] = useState<'chat' | 'document'>('chat')
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
   const preferredChannelId = channelId ?? rememberedChannelId
   const preferredDocumentId = documentId ?? rememberedDocumentId
@@ -132,45 +135,53 @@ export function WorkspaceSplitPage() {
         </button>
       </div>
 
-      <div className="split-workbench" style={{ ['--chat-pane-width' as string]: `${chatWidth}%` }}>
-        <div className={`split-pane chat-side ${activeMobilePane === 'chat' ? 'mobile-active' : ''}`}>
-          {selectedChannelId ? (
-            <ChatPanel
-              workspaceId={workspaceId}
-              channelId={selectedChannelId}
-              channelName={selectedChannel?.name}
-              hideStatus
-              variant="workbench"
-            />
-          ) : (
-            <EmptySplitPane title="채널이 없습니다" copy="왼쪽 사이드바에서 첫 채널을 만들면 이곳에서 바로 대화할 수 있습니다." loading={isLoading} />
-          )}
+      <div className="workbench-with-rail">
+        <div className="split-workbench" style={{ ['--chat-pane-width' as string]: `${chatWidth}%` }}>
+          <div className={`split-pane chat-side ${activeMobilePane === 'chat' ? 'mobile-active' : ''}`}>
+            {selectedChannelId ? (
+              <ChatPanel
+                workspaceId={workspaceId}
+                channelId={selectedChannelId}
+                channelName={selectedChannel?.name}
+                hideStatus
+                variant="workbench"
+              />
+            ) : (
+              <EmptySplitPane title="채널이 없습니다" copy="왼쪽 사이드바에서 첫 채널을 만들면 이곳에서 바로 대화할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
+
+          <button
+            className={`resizer ${isDragging ? 'dragging' : ''}`}
+            onMouseDown={() => setIsDragging(true)}
+            type="button"
+            aria-label="채팅과 문서 패널 너비 조절"
+          >
+            <span className="resizer-handle" />
+          </button>
+
+          <div className={`split-pane doc-side ${activeMobilePane === 'document' ? 'mobile-active' : ''}`}>
+            {selectedDocumentId ? (
+              <EditorPanel
+                workspaceId={workspaceId}
+                documentId={selectedDocumentId}
+                documentTitle={selectedDocument?.title}
+                documents={documents}
+                hideStatus
+                variant="workbench"
+              />
+            ) : (
+              <EmptySplitPane title="문서가 없습니다" copy="왼쪽 사이드바에서 첫 문서를 만들면 이곳에서 바로 공동 편집할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
         </div>
 
-        <button
-          className={`resizer ${isDragging ? 'dragging' : ''}`}
-          onMouseDown={() => setIsDragging(true)}
-          type="button"
-          aria-label="채팅과 문서 패널 너비 조절"
-        >
-          <span className="resizer-handle" />
-        </button>
-
-        <div className={`split-pane doc-side ${activeMobilePane === 'document' ? 'mobile-active' : ''}`}>
-          {selectedDocumentId ? (
-            <EditorPanel
-              workspaceId={workspaceId}
-              documentId={selectedDocumentId}
-              documentTitle={selectedDocument?.title}
-              documents={documents}
-              hideStatus
-              variant="workbench"
-            />
-          ) : (
-            <EmptySplitPane title="문서가 없습니다" copy="왼쪽 사이드바에서 첫 문서를 만들면 이곳에서 바로 공동 편집할 수 있습니다." loading={isLoading} />
-          )}
-        </div>
+        <AgentRail workspaceId={workspaceId} activeTaskId={activeTaskId} onSelectTask={setActiveTaskId} />
       </div>
+
+      {activeTaskId ? (
+        <TaskDetailDrawer taskId={activeTaskId} workspaceId={workspaceId} onClose={() => setActiveTaskId(null)} />
+      ) : null}
     </section>
   )
 }

@@ -54,6 +54,15 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
     const inviteCode = requiredString(body.inviteCode, '초대 코드', 40)
     const workspace = await joinWorkspaceByInviteCode({ inviteCode, userId: session.userId })
     if (!workspace) throw notFound('초대 코드에 해당하는 워크스페이스를 찾을 수 없습니다.', 'invalid_invite_code')
+    await writeAuditLog({
+      workspaceId: workspace.id,
+      actorParticipantId: session.participantId,
+      action: 'workspace.join',
+      resourceType: 'workspace',
+      resourceId: workspace.id,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    })
     return json({ workspace })
   })
 
@@ -87,6 +96,15 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
     const body = await ctx.json<{ name?: string }>()
     const name = requiredString(body.name, '채널 이름', 80)
     const channel = await createChannel({ workspaceId, name, createdBy: session.userId })
+    await writeAuditLog({
+      workspaceId,
+      actorParticipantId: session.participantId,
+      action: 'channel.create',
+      resourceType: 'channel',
+      resourceId: channel.id,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    })
     return json({ channel })
   })
 
@@ -102,6 +120,15 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
     const body = await ctx.json<{ title?: string }>()
     const title = requiredString(body.title, '문서 제목', 160)
     const document = await createDocument({ workspaceId, title, createdBy: session.userId })
+    await writeAuditLog({
+      workspaceId,
+      actorParticipantId: session.participantId,
+      action: 'document.create',
+      resourceType: 'document',
+      resourceId: document.id,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    })
     return json({ document })
   })
 

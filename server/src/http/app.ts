@@ -110,7 +110,7 @@ async function dispatch(
   logger: Logger,
   rawHandlers: RawHttpHandler[]
 ): Promise<void> {
-  const ctx = createRequestContext(request, response)
+  const ctx = createRequestContext(request, response, { trustProxy: config.trustProxy })
   const cors = corsHeaders(request)
 
   try {

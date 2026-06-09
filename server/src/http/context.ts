@@ -23,7 +23,11 @@ export interface RequestContext {
   header(name: string): string | null
 }
 
-export function createRequestContext(req: IncomingMessage, res: ServerResponse): RequestContext {
+export function createRequestContext(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: { trustProxy?: boolean } = {}
+): RequestContext {
   const url = new URL(req.url ?? '/', 'http://syncspace.local')
   let bodyPromise: Promise<Buffer> | null = null
 
@@ -41,7 +45,7 @@ export function createRequestContext(req: IncomingMessage, res: ServerResponse):
     query: url.searchParams,
     params: {},
     cookies: parseCookies(req.headers.cookie),
-    ip: readClientIp(req),
+    ip: readClientIp(req, options.trustProxy ?? false),
     session: null,
     agentToken: null,
     rawBody,
@@ -102,13 +106,17 @@ function decodeCookieValue(value: string): string {
   }
 }
 
-function readClientIp(req: IncomingMessage): string | null {
-  const forwarded = req.headers['x-forwarded-for']
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() ?? null
-  }
-  if (Array.isArray(forwarded) && forwarded[0]) {
-    return forwarded[0].split(',')[0]?.trim() ?? null
+function readClientIp(req: IncomingMessage, trustProxy: boolean): string | null {
+  // Only honor X-Forwarded-For behind a trusted proxy; otherwise it is client-spoofable
+  // and would let an attacker evade per-IP rate limits and poison audit IP hashes.
+  if (trustProxy) {
+    const forwarded = req.headers['x-forwarded-for']
+    if (typeof forwarded === 'string' && forwarded.length > 0) {
+      return forwarded.split(',')[0]?.trim() ?? null
+    }
+    if (Array.isArray(forwarded) && forwarded[0]) {
+      return forwarded[0].split(',')[0]?.trim() ?? null
+    }
   }
   return req.socket.remoteAddress ?? null
 }

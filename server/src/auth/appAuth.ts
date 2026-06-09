@@ -44,11 +44,21 @@ export async function registerUser(input: RegisterInput): Promise<{ user: AuthUs
   return { user: toAuthUser(created.user), userId: created.user.id }
 }
 
+// Precomputed once so login against an unknown email still runs a full scrypt
+// comparison (uniform timing → no user enumeration via response latency).
+let dummyHashPromise: Promise<string> | null = null
+function getDummyHash(): Promise<string> {
+  dummyHashPromise ??= hashPassword('syncspace-invalid-placeholder-password')
+  return dummyHashPromise
+}
+
 export async function authenticateUser(email: string, password: string): Promise<AppUserRow> {
   const normalized = normalizeEmail(email)
   const user = await findUserByEmail(normalized)
-  // Always run a hash comparison to keep timing uniform whether or not the user exists.
-  const ok = await verifyPassword(password, user?.password_hash ?? null)
+  // Compare against the user's hash, or a dummy hash when absent, so both paths
+  // perform equal scrypt work before any failure is returned.
+  const comparisonHash = user?.password_hash ?? (await getDummyHash())
+  const ok = await verifyPassword(password, comparisonHash)
   if (!user || user.disabled_at || !ok) {
     throw unauthorized('이메일 또는 비밀번호가 올바르지 않습니다.', 'invalid_credentials')
   }

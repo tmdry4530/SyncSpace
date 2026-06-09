@@ -8,6 +8,8 @@ import { destroySession, issueSession } from '../../auth/session.js'
 import { optionalSession, requireSession, readSessionToken } from '../../auth/middleware.js'
 import { buildSessionClearCookie, buildSessionSetCookie } from '../../auth/cookies.js'
 import { findUserById, toAuthUser as rowToAuthUser } from '../../db/repositories/userRepository.js'
+import { writeAuditLog } from '../../db/repositories/auditRepository.js'
+import { hashIp } from '../../utils/crypto.js'
 
 function registrationAllowed(config: ServerConfig): boolean {
   return config.nodeEnv !== 'production' || process.env.AUTH_ALLOW_OPEN_REGISTRATION === 'true'
@@ -41,8 +43,27 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
       throw tooManyRequests('로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.')
     }
 
-    const user = await authenticateUser(body.email, body.password)
+    let user
+    try {
+      user = await authenticateUser(body.email, body.password)
+    } catch (error) {
+      await writeAuditLog({
+        action: 'auth.login_failed',
+        resourceType: 'auth',
+        resourceId: body.email.toLowerCase(),
+        ipHash: hashIp(ctx.ip, config.authSecret),
+        userAgent: ctx.header('user-agent')
+      }).catch(() => undefined)
+      throw error
+    }
     const session = await issueSession(config, user.id, { userAgent: ctx.header('user-agent'), ip: ctx.ip })
+    await writeAuditLog({
+      action: 'auth.login',
+      resourceType: 'auth',
+      resourceId: user.id,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    }).catch(() => undefined)
     return json({ user: toAuthUser(user) }, 200, {
       'set-cookie': buildSessionSetCookie(config, session.token, session.expiresAt)
     })

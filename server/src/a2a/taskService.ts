@@ -50,8 +50,14 @@ export async function assembleTask(taskId: string): Promise<Task | null> {
 }
 
 export async function createTaskFromMessage(input: CreateTaskInput): Promise<CreateTaskResult> {
-  // messageId idempotency within an existing context.
+  // messageId idempotency within an existing context. Verify the context belongs
+  // to the caller's workspace BEFORE the lookup so the idempotency fast-path can
+  // never disclose another workspace's task (IDOR via attacker-supplied contextId).
   if (input.contextId) {
+    const contextRow = await getContext(input.contextId)
+    if (!contextRow || contextRow.workspace_id !== input.workspaceId) {
+      throw new Error('A2A context not found')
+    }
     const existing = await findA2aMessage(input.contextId, input.message.messageId)
     if (existing?.task_id) {
       const task = await assembleTask(existing.task_id)

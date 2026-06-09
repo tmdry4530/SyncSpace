@@ -24,6 +24,7 @@ export interface ServerConfig {
   a2aInterfaceUrl: string
   a2aAgentCardUrl: string | null
   docPersistenceMode: DocPersistenceMode
+  trustProxy: boolean
 }
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']
@@ -49,6 +50,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const a2aInterfaceUrl = (nonEmpty(env.A2A_INTERFACE_URL) ?? `${publicAppUrl ?? 'http://localhost:1234'}/a2a`).replace(/\/$/, '')
   const a2aAgentCardUrl = readFirstEnv(env, ['A2A_AGENT_CARD_URL'])
   const docPersistenceMode = parseDocPersistenceMode(env.SYNCSPACE_DOC_PERSISTENCE_MODE, databaseUrl)
+  // Trust X-Forwarded-For only behind a known proxy (Railway/Caddy terminate it).
+  const trustProxy = env.TRUST_PROXY ? env.TRUST_PROXY.trim().toLowerCase() === 'true' : nodeEnv === 'production'
 
   assertSupabaseAuthConfig(wsAuthMode, { supabaseUrl, supabaseServiceRoleKey })
   assertSessionAuthConfig(wsAuthMode, nodeEnv, { databaseUrl, authSecret })
@@ -71,7 +74,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     a2aVersion,
     a2aInterfaceUrl,
     a2aAgentCardUrl,
-    docPersistenceMode
+    docPersistenceMode,
+    trustProxy
   }
 }
 
@@ -151,8 +155,9 @@ function parseList(value: string | undefined, fallback: string[]): string[] {
 
 function parseAuthMode(value: string | undefined, nodeEnv: string): RealtimeAuthMode {
   const normalized = value?.trim().toLowerCase()
-  if (!normalized) return nodeEnv === 'production' ? 'supabase' : 'off'
-  if (normalized === 'off' || normalized === 'supabase') return normalized
+  // App-owned session auth is the production default now that Supabase is removed.
+  if (!normalized) return nodeEnv === 'production' ? 'session' : 'off'
+  if (normalized === 'off' || normalized === 'supabase' || normalized === 'session') return normalized
   throw new Error(`Invalid WS_AUTH_MODE value: ${value}`)
 }
 

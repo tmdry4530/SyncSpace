@@ -22,8 +22,9 @@ import { getTask, listTasks, type A2aTaskRow } from '../db/repositories/a2aRepos
 import { listEvents } from '../db/repositories/a2aRepository.js'
 import { getAgentBySlug, ensureDefaultAgents } from '../db/repositories/agentRepository.js'
 import { createPushConfig, deletePushConfig, getPushConfig, listPushConfigs } from '../db/repositories/a2aPushRepository.js'
+import { writeAuditLog } from '../db/repositories/auditRepository.js'
 import { assertSafeWebhookUrl } from './push.js'
-import { hashToken } from '../utils/crypto.js'
+import { hashIp, hashToken } from '../utils/crypto.js'
 import { mapTaskRowToA2aTask, mapEventRowToStreamResponse } from './mapper.js'
 import { isTerminalState, type Part, type StreamResponse, type Task } from './types.js'
 import {
@@ -319,18 +320,22 @@ async function handleSubscribe(ctx: RequestContext, deps: A2aHandlerDeps, taskId
 
 // ---------- push notification configs ----------
 
-async function authorizeTaskForPush(ctx: RequestContext, deps: A2aHandlerDeps, taskId: string): Promise<A2aTaskRow> {
+async function authorizeTaskForPush(
+  ctx: RequestContext,
+  deps: A2aHandlerDeps,
+  taskId: string
+): Promise<{ taskRow: A2aTaskRow; principal: A2aPrincipal }> {
   const principal = await requirePrincipal(ctx, deps.config)
   requireScope(principal, 'push:write')
   const taskRow = await getTask(taskId)
   if (!taskRow) throw notFound('Task not found.')
   await assertWorkspaceAccess(principal, taskRow.workspace_id)
-  return taskRow
+  return { taskRow, principal }
 }
 
 async function handleCreatePushConfig(ctx: RequestContext, deps: A2aHandlerDeps, taskId: string): Promise<HttpResponse> {
   validateA2aContentType(ctx)
-  const taskRow = await authorizeTaskForPush(ctx, deps, taskId)
+  const { taskRow, principal } = await authorizeTaskForPush(ctx, deps, taskId)
   const body = parseOrThrow(PushConfigSchema, await ctx.json())
   const cfg = body.pushNotificationConfig
 
@@ -346,11 +351,21 @@ async function handleCreatePushConfig(ctx: RequestContext, deps: A2aHandlerDeps,
     authCredentialsHash: credentials ? hashToken(credentials, deps.config.agentTokenPepper) : null,
     ...(cfg.authentication ? { authentication: cfg.authentication } : {})
   })
+  await writeAuditLog({
+    workspaceId: taskRow.workspace_id,
+    actorParticipantId: principal.participantId,
+    action: 'a2a.push_config.create',
+    resourceType: 'a2a_push_config',
+    resourceId: configId,
+    metadata: { taskId, url: cfg.url },
+    ipHash: hashIp(ctx.ip, deps.config.authSecret),
+    userAgent: ctx.header('user-agent')
+  })
   return json({ pushNotificationConfig: serializePushConfig(row, taskRow.id) })
 }
 
 async function handleListPushConfigs(ctx: RequestContext, deps: A2aHandlerDeps, taskId: string): Promise<HttpResponse> {
-  const taskRow = await authorizeTaskForPush(ctx, deps, taskId)
+  const { taskRow } = await authorizeTaskForPush(ctx, deps, taskId)
   const rows = await listPushConfigs(taskId)
   return json({ pushNotificationConfigs: rows.map((row) => serializePushConfig(row, taskRow.id)) })
 }
@@ -361,7 +376,7 @@ async function handleGetPushConfig(
   taskId: string,
   configId: string
 ): Promise<HttpResponse> {
-  const taskRow = await authorizeTaskForPush(ctx, deps, taskId)
+  const { taskRow } = await authorizeTaskForPush(ctx, deps, taskId)
   const row = await getPushConfig(taskId, configId)
   if (!row) throw notFound('Push notification config not found.')
   return json({ pushNotificationConfig: serializePushConfig(row, taskRow.id) })
@@ -373,9 +388,19 @@ async function handleDeletePushConfig(
   taskId: string,
   configId: string
 ): Promise<HttpResponse> {
-  await authorizeTaskForPush(ctx, deps, taskId)
+  const { taskRow, principal } = await authorizeTaskForPush(ctx, deps, taskId)
   const deleted = await deletePushConfig(taskId, configId)
   if (!deleted) throw notFound('Push notification config not found.')
+  await writeAuditLog({
+    workspaceId: taskRow.workspace_id,
+    actorParticipantId: principal.participantId,
+    action: 'a2a.push_config.delete',
+    resourceType: 'a2a_push_config',
+    resourceId: configId,
+    metadata: { taskId },
+    ipHash: hashIp(ctx.ip, deps.config.authSecret),
+    userAgent: ctx.header('user-agent')
+  })
   return { kind: 'empty', status: 204 }
 }
 

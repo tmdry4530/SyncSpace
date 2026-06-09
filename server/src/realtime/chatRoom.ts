@@ -44,16 +44,26 @@ export function normalizeChatMessage(value: unknown, channelId: string): Message
   if (!value || typeof value !== 'object') return null
   const record = value as Record<string, unknown>
   const userId = typeof record.userId === 'string' ? record.userId : null
+  const authorParticipantId = typeof record.authorParticipantId === 'string' ? record.authorParticipantId : null
   const content = typeof record.content === 'string' ? record.content : null
-  if (!userId || !content) return null
+  // A persistable message needs content and an author (legacy user or participant).
+  if (!content || (!userId && !authorParticipantId)) return null
+
+  const authorType = record.authorType === 'agent' ? 'agent' : 'human'
+  const metadata =
+    record.metadata && typeof record.metadata === 'object' ? (record.metadata as Record<string, unknown>) : undefined
 
   return {
     ...(typeof record.id === 'string' ? { id: record.id } : {}),
     channelId: typeof record.channelId === 'string' ? record.channelId : channelId,
-    userId,
+    ...(userId ? { userId } : {}),
+    ...(authorParticipantId ? { authorParticipantId } : {}),
+    authorType,
+    ...(typeof record.agentId === 'string' ? { agentId: record.agentId } : {}),
     content,
     ...(typeof record.clientId === 'string' ? { clientId: record.clientId } : {}),
-    ...(typeof record.createdAt === 'string' ? { createdAt: record.createdAt } : {})
+    ...(typeof record.createdAt === 'string' ? { createdAt: record.createdAt } : {}),
+    ...(metadata ? { metadata } : {})
   }
 }
 

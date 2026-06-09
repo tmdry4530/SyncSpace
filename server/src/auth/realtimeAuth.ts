@@ -4,6 +4,10 @@ import type { ServerConfig } from '../config.js'
 import { createSupabaseAdminClient } from '../persistence/supabaseAdmin.js'
 import type { RealtimeRoute } from '../realtime/roomNames.js'
 import type { Logger } from '../utils/logger.js'
+import { parseCookies } from '../http/context.js'
+import { resolveSession } from './session.js'
+import { resolveAgentToken } from './agentToken.js'
+import { getMembership } from '../db/repositories/workspaceRepository.js'
 
 export interface RealtimeAuthContext {
   request: IncomingMessage
@@ -63,9 +67,55 @@ export class SupabaseRealtimeAuthorizer implements RealtimeAuthorizer {
   }
 }
 
+/**
+ * App-owned realtime authorization: resolves a session cookie / bearer token (or
+ * an agent token) and confirms workspace membership before allowing the upgrade.
+ */
+export class SessionRealtimeAuthorizer implements RealtimeAuthorizer {
+  constructor(
+    private readonly config: ServerConfig,
+    private readonly logger: Logger
+  ) {}
+
+  async authorize(context: RealtimeAuthContext): Promise<RealtimeAuthResult> {
+    const token = readSessionToken(context.request, this.config)
+    if (!token) return { ok: false, reason: 'missing_session' }
+
+    try {
+      const session = await resolveSession(this.config, token)
+      if (session) {
+        const membership = await getMembership(context.route.workspaceId, session.userId)
+        if (!membership) return { ok: false, reason: 'not_workspace_member' }
+        return { ok: true, userId: session.userId }
+      }
+
+      // Fall back to agent token (agents connect to the same rooms as participants).
+      const agent = await resolveAgentToken(this.config, token)
+      if (agent && agent.workspaceId === context.route.workspaceId) {
+        return { ok: true, userId: agent.agentId }
+      }
+      return { ok: false, reason: 'invalid_session' }
+    } catch (error) {
+      this.logger.warn('Realtime session authorization failed', {
+        workspaceId: context.route.workspaceId,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return { ok: false, reason: 'authorization_error' }
+    }
+  }
+}
+
 export function createRealtimeAuthorizer(config: ServerConfig, logger: Logger): RealtimeAuthorizer {
   if (config.wsAuthMode === 'off') return new AllowAllRealtimeAuthorizer()
+  if (config.wsAuthMode === 'session') return new SessionRealtimeAuthorizer(config, logger)
   return new SupabaseRealtimeAuthorizer(createSupabaseAdminClient(config), logger)
+}
+
+function readSessionToken(request: IncomingMessage, config: ServerConfig): string | null {
+  const cookies = parseCookies(request.headers.cookie)
+  const cookieToken = cookies[config.sessionCookieName]
+  if (cookieToken) return cookieToken
+  return getAccessToken(request)
 }
 
 export function getAccessToken(request: IncomingMessage): string | null {

@@ -1,56 +1,111 @@
 import { dirname, join } from 'node:path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import * as Y from 'yjs'
+import type { ServerConfig } from '../config.js'
 import type { Logger } from '../utils/logger.js'
-import { isDocRoomName } from './docRoom.js'
+import { isDocRoomName, parseDocRoomName } from './docRoom.js'
+import { readSnapshot as readPgSnapshot, upsertSnapshot } from '../db/repositories/yjsSnapshotRepository.js'
 
 export interface DocPersistenceHooks {
-  bind(roomName: string, ydoc: Y.Doc): void
+  bind(roomName: string, ydoc: Y.Doc): Promise<void>
   flush(roomName: string, ydoc: Y.Doc): Promise<void>
+}
+
+/** Storage backend for Yjs document snapshots. */
+export interface DocStorageBackend {
+  read(roomName: string): Promise<Uint8Array | null>
+  write(roomName: string, update: Uint8Array): Promise<void>
 }
 
 export interface DocPersistenceOptions {
   debounceMs?: number
-  storageDir?: string | null
+  backend?: DocStorageBackend
+}
+
+export class FileDocStorage implements DocStorageBackend {
+  constructor(
+    private readonly storageDir: string,
+    private readonly logger: Logger
+  ) {}
+
+  async read(roomName: string): Promise<Uint8Array | null> {
+    const filePath = this.path(roomName)
+    if (!existsSync(filePath)) return null
+    try {
+      return new Uint8Array(readFileSync(filePath))
+    } catch (error) {
+      this.logger.warn('Failed to read document Yjs snapshot', { roomName, error: errMessage(error) })
+      return null
+    }
+  }
+
+  async write(roomName: string, update: Uint8Array): Promise<void> {
+    const filePath = this.path(roomName)
+    mkdirSync(dirname(filePath), { recursive: true })
+    writeFileSync(filePath, update)
+  }
+
+  private path(roomName: string): string {
+    return join(this.storageDir, `${Buffer.from(roomName).toString('base64url')}.bin`)
+  }
+}
+
+export class PostgresDocStorage implements DocStorageBackend {
+  constructor(private readonly logger: Logger) {}
+
+  async read(roomName: string): Promise<Uint8Array | null> {
+    try {
+      return await readPgSnapshot(roomName)
+    } catch (error) {
+      this.logger.warn('Failed to read document snapshot from Postgres', { roomName, error: errMessage(error) })
+      return null
+    }
+  }
+
+  async write(roomName: string, update: Uint8Array): Promise<void> {
+    const parts = parseDocRoomName(roomName)
+    if (!parts) return
+    await upsertSnapshot({
+      roomName,
+      workspaceId: parts.workspaceId,
+      documentId: parts.documentId,
+      stateUpdate: update
+    })
+  }
+}
+
+export function createDocStorageBackend(config: ServerConfig, logger: Logger): DocStorageBackend {
+  if (config.docPersistenceMode === 'postgres' && config.databaseUrl) {
+    return new PostgresDocStorage(logger)
+  }
+  const storageDir = process.env.SYNCSPACE_DOC_PERSISTENCE_DIR ?? '.syncspace-data/ydocs'
+  return new FileDocStorage(storageDir, logger)
 }
 
 export function createDocRoomPersistenceHooks(logger: Logger, options: DocPersistenceOptions = {}): DocPersistenceHooks {
   const debounceMs = options.debounceMs ?? 250
-  const storageDir = options.storageDir ?? process.env.SYNCSPACE_DOC_PERSISTENCE_DIR ?? '.syncspace-data/ydocs'
-  const snapshots = new Map<string, Uint8Array>()
+  const backend = options.backend ?? new FileDocStorage(process.env.SYNCSPACE_DOC_PERSISTENCE_DIR ?? '.syncspace-data/ydocs', logger)
   const timers = new Map<string, NodeJS.Timeout>()
 
   async function flush(roomName: string, ydoc: Y.Doc): Promise<void> {
     if (!isDocRoomName(roomName)) return
-
     try {
       const update = Y.encodeStateAsUpdate(ydoc)
-      snapshots.set(roomName, update)
-      if (storageDir) {
-        const filePath = snapshotPath(storageDir, roomName)
-        mkdirSync(dirname(filePath), { recursive: true })
-        writeFileSync(filePath, update)
-      }
+      await backend.write(roomName, update)
     } catch (error) {
-      logger.warn('Failed to persist document Yjs state', {
-        roomName,
-        error: error instanceof Error ? error.message : String(error)
-      })
+      logger.warn('Failed to persist document Yjs state', { roomName, error: errMessage(error) })
     }
   }
 
-  function bind(roomName: string, ydoc: Y.Doc): void {
+  async function bind(roomName: string, ydoc: Y.Doc): Promise<void> {
     if (!isDocRoomName(roomName)) return
 
-    const stored = readSnapshot(roomName)
+    const stored = await backend.read(roomName)
     if (stored) {
       try {
         Y.applyUpdate(ydoc, stored)
       } catch (error) {
-        logger.warn('Failed to restore document Yjs state', {
-          roomName,
-          error: error instanceof Error ? error.message : String(error)
-        })
+        logger.warn('Failed to restore document Yjs state', { roomName, error: errMessage(error) })
       }
     }
 
@@ -65,33 +120,12 @@ export function createDocRoomPersistenceHooks(logger: Logger, options: DocPersis
     }
 
     ydoc.on('update', scheduleFlush)
-    void flush(roomName, ydoc)
-  }
-
-  function readSnapshot(roomName: string): Uint8Array | null {
-    const inMemory = snapshots.get(roomName)
-    if (inMemory) return inMemory
-    if (!storageDir) return null
-
-    const filePath = snapshotPath(storageDir, roomName)
-    if (!existsSync(filePath)) return null
-    try {
-      const buffer = readFileSync(filePath)
-      const update = new Uint8Array(buffer)
-      snapshots.set(roomName, update)
-      return update
-    } catch (error) {
-      logger.warn('Failed to read document Yjs snapshot', {
-        roomName,
-        error: error instanceof Error ? error.message : String(error)
-      })
-      return null
-    }
+    await flush(roomName, ydoc)
   }
 
   return { bind, flush }
 }
 
-function snapshotPath(storageDir: string, roomName: string): string {
-  return join(storageDir, `${Buffer.from(roomName).toString('base64url')}.bin`)
+function errMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

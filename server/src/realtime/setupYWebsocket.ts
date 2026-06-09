@@ -8,7 +8,7 @@ import type { RealtimeAuthorizer } from '../auth/realtimeAuth.js'
 import type { MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import type { Logger } from '../utils/logger.js'
 import { createChatRoomPersistenceHooks } from './chatRoom.js'
-import { createDocRoomPersistenceHooks } from './docPersistence.js'
+import { createDocRoomPersistenceHooks, createDocStorageBackend } from './docPersistence.js'
 import { parseRealtimeRequestUrl, type RealtimeRoute } from './roomNames.js'
 
 export interface RealtimeStats {
@@ -43,13 +43,13 @@ export function setupYWebsocketServer(options: SetupYWebsocketOptions): Realtime
     handleProtocols: (protocols) => (protocols.has('bearer') ? 'bearer' : false)
   })
   const chatPersistence = createChatRoomPersistenceHooks(messagePersistence, logger)
-  const docPersistence = createDocRoomPersistenceHooks(logger)
+  const docPersistence = createDocRoomPersistenceHooks(logger, { backend: createDocStorageBackend(config, logger) })
 
   setPersistence({
     provider: null,
-    bindState: (docName: string, ydoc: Y.Doc) => {
+    bindState: async (docName: string, ydoc: Y.Doc) => {
       chatPersistence.bind(docName, ydoc)
-      docPersistence.bind(docName, ydoc)
+      await docPersistence.bind(docName, ydoc)
     },
     writeState: async (docName: string, ydoc: Y.Doc) => {
       await chatPersistence.flush(docName, ydoc)

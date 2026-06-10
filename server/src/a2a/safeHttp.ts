@@ -1,6 +1,6 @@
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
-import { lookup as dnsLookup, type LookupAddress } from 'node:dns'
+import { lookup as dnsLookup, type LookupAddress, type LookupOptions } from 'node:dns'
 import { isIP } from 'node:net'
 import { isBlockedAddress } from './push.js'
 
@@ -33,11 +33,15 @@ function insecureAllowed(): boolean {
   return process.env.NODE_ENV !== 'production' && process.env.A2A_ALLOW_INSECURE_WEBHOOKS === 'true'
 }
 
+type PinnedLookupCallback =
+  & ((err: NodeJS.ErrnoException | null, address: string, family: number) => void)
+  & ((err: NodeJS.ErrnoException | null, addresses: LookupAddress[]) => void)
+
 /** dns.lookup replacement that validates + pins the resolved address. */
 function pinnedLookup(
   hostname: string,
-  _options: unknown,
-  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+  options: LookupOptions,
+  callback: PinnedLookupCallback
 ): void {
   dnsLookup(hostname, { all: true }, (err, addresses: LookupAddress[]) => {
     if (err) return callback(err, '', 0)
@@ -47,6 +51,10 @@ function pinnedLookup(
       if (isBlockedAddress(entry.address)) {
         return callback(new Error(`Blocked address ${entry.address} for ${hostname}`) as NodeJS.ErrnoException, '', 0)
       }
+    }
+    if (options?.all) {
+      callback(null, addresses)
+      return
     }
     callback(null, chosen.address, chosen.family)
   })

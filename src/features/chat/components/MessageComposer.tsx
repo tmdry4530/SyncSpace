@@ -5,7 +5,9 @@ import { useChatUiStore } from '../../../shared/stores/chatUiStore'
 import { useAgentsQuery } from '../../agents/queries/useAgentsQuery'
 import { useInvokeAgentMutation } from '../../agents/mutations/useInvokeAgentMutation'
 import { MentionSuggestions, filterAgentsByQuery } from '../../agents/components/MentionSuggestions'
-import type { AgentProfile } from '../../../shared/types/contracts'
+import { useRemoteAgentsQuery } from '../../remote-agents/queries/useRemoteAgentsQuery'
+import { useInvokeRemoteAgentMutation } from '../../remote-agents/mutations/useInvokeRemoteAgentMutation'
+import type { AgentProfile, RemoteAgentProfile } from '../../../shared/types/contracts'
 
 interface MessageComposerProps {
   workspaceId: string
@@ -19,12 +21,14 @@ const LEADING_MENTION = /^@([a-z0-9_-]+)\s+([\s\S]+)$/i
 const TRAILING_MENTION = /(?:^|\s)@([a-z0-9_-]*)$/i
 
 export function MessageComposer({ workspaceId, channelId, onSend }: MessageComposerProps) {
-  const user = useAuthStore((state) => state.user)
+  const identity = useAuthStore((state) => state.identity)
   const draft = useChatUiStore((state) => state.draftByChannelId[channelId] ?? '')
   const setDraft = useChatUiStore((state) => state.setDraft)
   const clearDraft = useChatUiStore((state) => state.clearDraft)
   const { data: agents = [] } = useAgentsQuery(workspaceId)
+  const { data: remoteAgents = [] } = useRemoteAgentsQuery(Boolean(workspaceId))
   const invokeAgent = useInvokeAgentMutation(workspaceId)
+  const invokeRemoteAgent = useInvokeRemoteAgentMutation(workspaceId)
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   const agentsBySlug = useMemo(() => {
@@ -32,6 +36,17 @@ export function MessageComposer({ workspaceId, channelId, onSend }: MessageCompo
     for (const agent of agents) map.set(agent.slug.toLowerCase(), agent)
     return map
   }, [agents])
+
+  // Only verified, non-unhealthy remote agents are invokable (server enforces too).
+  const remoteAgentsBySlug = useMemo(() => {
+    const map = new Map<string, RemoteAgentProfile>()
+    for (const agent of remoteAgents) {
+      if (agent.verificationStatus === 'verified' && agent.healthStatus !== 'unhealthy') {
+        map.set(agent.slug.toLowerCase(), agent)
+      }
+    }
+    return map
+  }, [remoteAgents])
 
   const mentionQuery = TRAILING_MENTION.exec(draft)?.[1] ?? null
   const suggestions = useMemo(
@@ -42,8 +57,8 @@ export function MessageComposer({ workspaceId, channelId, onSend }: MessageCompo
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = draft.trim()
-    if (!content || !user) return
-    onSend({ content, userId: user.id })
+    if (!content || !identity) return
+    onSend({ content, userId: identity.participantId })
     clearDraft(channelId)
     setShowSuggestions(false)
 
@@ -51,9 +66,17 @@ export function MessageComposer({ workspaceId, channelId, onSend }: MessageCompo
     if (mention) {
       const slug = mention[1]?.toLowerCase() ?? ''
       const remaining = mention[2]?.trim() ?? ''
-      const agent = agentsBySlug.get(slug)
-      if (agent && remaining) {
-        invokeAgent.mutate({ agentId: agent.id, content: remaining, channelId })
+      if (remaining) {
+        // Internal agents take priority; fall back to a verified remote agent of the same slug.
+        const agent = agentsBySlug.get(slug)
+        if (agent) {
+          invokeAgent.mutate({ agentId: agent.id, content: remaining, channelId })
+        } else {
+          const remoteAgent = remoteAgentsBySlug.get(slug)
+          if (remoteAgent) {
+            invokeRemoteAgent.mutate({ id: remoteAgent.id, content: remaining, channelId })
+          }
+        }
       }
     }
   }
@@ -83,7 +106,7 @@ export function MessageComposer({ workspaceId, channelId, onSend }: MessageCompo
         onBlur={() => setShowSuggestions(false)}
         placeholder="메시지를 입력하고 Enter · @에이전트로 멘션"
       />
-      <button className="button primary icon-button-send" disabled={!draft.trim() || !user} type="submit" aria-label="보내기">
+      <button className="button primary icon-button-send" disabled={!draft.trim() || !identity} type="submit" aria-label="보내기">
         <Send size={18} />
       </button>
     </form>

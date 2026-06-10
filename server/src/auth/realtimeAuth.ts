@@ -1,22 +1,31 @@
 import type { IncomingMessage } from 'node:http'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServerConfig } from '../config.js'
-import { createSupabaseAdminClient } from '../persistence/supabaseAdmin.js'
 import type { RealtimeRoute } from '../realtime/roomNames.js'
+import type { ParticipantType } from '../types/contracts.js'
 import type { Logger } from '../utils/logger.js'
 import { parseCookies } from '../http/context.js'
-import { resolveSession } from './session.js'
 import { resolveAgentToken } from './agentToken.js'
-import { getMembership } from '../db/repositories/workspaceRepository.js'
 
 export interface RealtimeAuthContext {
   request: IncomingMessage
   route: RealtimeRoute
 }
 
+/**
+ * Authenticated identity bound to a realtime connection at upgrade time.
+ * Persistence paths must derive message authorship from this — never from
+ * client-controlled Yjs document content.
+ */
+export interface RealtimeConnectionIdentity {
+  participantId: string
+  agentId: string | null
+  authorType: ParticipantType
+}
+
 export interface RealtimeAuthResult {
   ok: boolean
   userId?: string
+  identity?: RealtimeConnectionIdentity
   reason?: string
 }
 
@@ -30,73 +39,35 @@ export class AllowAllRealtimeAuthorizer implements RealtimeAuthorizer {
   }
 }
 
-export class SupabaseRealtimeAuthorizer implements RealtimeAuthorizer {
-  constructor(
-    private readonly client: SupabaseClient,
-    private readonly logger: Logger
-  ) {}
-
-  async authorize(context: RealtimeAuthContext): Promise<RealtimeAuthResult> {
-    const token = getAccessToken(context.request)
-    if (!token) return { ok: false, reason: 'missing_access_token' }
-
-    const userResult = await this.client.auth.getUser(token)
-    const userId = userResult.data?.user?.id
-    if (userResult.error || !userId) {
-      return { ok: false, reason: 'invalid_access_token' }
-    }
-
-    const membershipResult = await this.client
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('workspace_id', context.route.workspaceId)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    if (membershipResult.error) {
-      this.logger.warn('Realtime membership check failed', {
-        workspaceId: context.route.workspaceId,
-        userId,
-        error: membershipResult.error.message
-      })
-      return { ok: false, reason: 'membership_check_failed' }
-    }
-
-    if (!membershipResult.data) return { ok: false, reason: 'not_workspace_member' }
-    return { ok: true, userId }
-  }
-}
-
 /**
- * App-owned realtime authorization: resolves a session cookie / bearer token (or
- * an agent token) and confirms workspace membership before allowing the upgrade.
+ * App-owned realtime authorization: resolves the agent credential (session
+ * cookie / bearer token / ?token=) and confirms it belongs to the room's
+ * workspace before allowing the WebSocket upgrade.
  */
-export class SessionRealtimeAuthorizer implements RealtimeAuthorizer {
+export class AgentRealtimeAuthorizer implements RealtimeAuthorizer {
   constructor(
     private readonly config: ServerConfig,
     private readonly logger: Logger
   ) {}
 
   async authorize(context: RealtimeAuthContext): Promise<RealtimeAuthResult> {
-    const token = readSessionToken(context.request, this.config)
-    if (!token) return { ok: false, reason: 'missing_session' }
+    const token = readAuthToken(context.request, this.config)
+    if (!token) return { ok: false, reason: 'missing_credential' }
 
     try {
-      const session = await resolveSession(this.config, token)
-      if (session) {
-        const membership = await getMembership(context.route.workspaceId, session.userId)
-        if (!membership) return { ok: false, reason: 'not_workspace_member' }
-        return { ok: true, userId: session.userId }
-      }
-
-      // Fall back to agent token (agents connect to the same rooms as participants).
       const agent = await resolveAgentToken(this.config, token)
-      if (agent && agent.workspaceId === context.route.workspaceId) {
-        return { ok: true, userId: agent.agentId }
+      if (!agent) return { ok: false, reason: 'invalid_credential' }
+      if (agent.workspaceId !== context.route.workspaceId) return { ok: false, reason: 'not_workspace_member' }
+      const principalId = agent.agentId ?? agent.remoteAgentId
+      return {
+        ok: true,
+        ...(principalId ? { userId: principalId } : {}),
+        // resolveAgentToken only resolves agent-owned participants, so the
+        // authenticated author type is always 'agent'.
+        identity: { participantId: agent.participantId, agentId: agent.agentId, authorType: 'agent' }
       }
-      return { ok: false, reason: 'invalid_session' }
     } catch (error) {
-      this.logger.warn('Realtime session authorization failed', {
+      this.logger.warn('Realtime authorization failed', {
         workspaceId: context.route.workspaceId,
         error: error instanceof Error ? error.message : String(error)
       })
@@ -107,11 +78,10 @@ export class SessionRealtimeAuthorizer implements RealtimeAuthorizer {
 
 export function createRealtimeAuthorizer(config: ServerConfig, logger: Logger): RealtimeAuthorizer {
   if (config.wsAuthMode === 'off') return new AllowAllRealtimeAuthorizer()
-  if (config.wsAuthMode === 'session') return new SessionRealtimeAuthorizer(config, logger)
-  return new SupabaseRealtimeAuthorizer(createSupabaseAdminClient(config), logger)
+  return new AgentRealtimeAuthorizer(config, logger)
 }
 
-function readSessionToken(request: IncomingMessage, config: ServerConfig): string | null {
+function readAuthToken(request: IncomingMessage, config: ServerConfig): string | null {
   const cookies = parseCookies(request.headers.cookie)
   const cookieToken = cookies[config.sessionCookieName]
   if (cookieToken) return cookieToken

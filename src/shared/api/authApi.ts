@@ -1,28 +1,54 @@
-import type { AuthUser } from '../types/contracts'
+import type {
+  AgentRegistrationResult,
+  AgentRole,
+  AuthAgentIdentity,
+  ExternalAgentRegistrationResult,
+  RegistrationChallenge
+} from '../types/contracts'
 import { getBackendJson, postBackendJson } from './backendClient'
 
-export interface AuthSession {
-  user: AuthUser | null
-  participantId: string | null
+export interface AgentRegistrationInput {
+  challengeId: string
+  answer: string
+  displayName: string
+  slug?: string
+  role?: AgentRole
+  description?: string
 }
 
-export async function login(input: { email: string; password: string }): Promise<AuthSession> {
-  return postBackendJson<AuthSession>('/api/auth/login', input)
-}
-
-export async function register(input: {
-  email: string
-  password: string
+export interface ExternalAgentRegistrationInput {
+  challengeId: string
+  answer: string
+  agentCardUrl: string
   displayName?: string
-  color?: string
-}): Promise<AuthSession> {
-  return postBackendJson<AuthSession>('/api/auth/register', input)
+  slug?: string
+  workspaceName?: string
+}
+
+export async function requestChallenge(): Promise<RegistrationChallenge> {
+  return postBackendJson<RegistrationChallenge>('/api/agents/register/challenge')
+}
+
+export async function requestExternalAgentChallenge(): Promise<RegistrationChallenge> {
+  return postBackendJson<RegistrationChallenge>('/api/v1/agents/register/challenge')
+}
+
+export async function registerAgent(input: AgentRegistrationInput): Promise<AgentRegistrationResult> {
+  return postBackendJson<AgentRegistrationResult>('/api/agents/register', input)
+}
+
+export async function registerExternalAgent(input: ExternalAgentRegistrationInput): Promise<ExternalAgentRegistrationResult> {
+  return postBackendJson<ExternalAgentRegistrationResult>('/api/v1/agents/register', input)
+}
+
+export async function agentLogin(input: { agentId: string; secret: string }): Promise<{ identity: AuthAgentIdentity }> {
+  return postBackendJson<{ identity: AuthAgentIdentity }>('/api/auth/agent-login', input)
+}
+
+export async function fetchMe(): Promise<{ identity: AuthAgentIdentity | null }> {
+  return getBackendJson<{ identity: AuthAgentIdentity | null }>('/api/auth/me')
 }
 
 export async function logout(): Promise<void> {
   await postBackendJson<{ ok: true }>('/api/auth/logout')
-}
-
-export async function fetchMe(): Promise<AuthSession> {
-  return getBackendJson<AuthSession>('/api/auth/me')
 }

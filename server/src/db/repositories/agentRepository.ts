@@ -88,15 +88,14 @@ export interface CreateAgentInput {
   modelName?: string | null
   systemPolicy?: Record<string, unknown>
   agentCard?: Record<string, unknown>
-  createdBy?: string | null
 }
 
 /** Create an agent and its agent participant atomically. */
-export async function createAgent(input: CreateAgentInput): Promise<AgentWithParticipant> {
-  return withTransaction(async (client) => {
+export async function createAgent(input: CreateAgentInput, outerClient?: Queryable): Promise<AgentWithParticipant> {
+  const run = async (client: Queryable): Promise<AgentWithParticipant> => {
     const agentRows = await query<AgentRow>(
-      `insert into agents (workspace_id, slug, display_name, description, role, model_provider, model_name, system_policy, agent_card, created_by)
-       values ($1, $2, $3, $4, $5, $6, $7, coalesce($8::jsonb, '{}'::jsonb), coalesce($9::jsonb, '{}'::jsonb), $10)
+      `insert into agents (workspace_id, slug, display_name, description, role, model_provider, model_name, system_policy, agent_card)
+       values ($1, $2, $3, $4, $5, $6, $7, coalesce($8::jsonb, '{}'::jsonb), coalesce($9::jsonb, '{}'::jsonb))
        returning *`,
       [
         input.workspaceId,
@@ -107,8 +106,7 @@ export async function createAgent(input: CreateAgentInput): Promise<AgentWithPar
         input.modelProvider ?? null,
         input.modelName ?? null,
         input.systemPolicy ? JSON.stringify(input.systemPolicy) : null,
-        input.agentCard ? JSON.stringify(input.agentCard) : null,
-        input.createdBy ?? null
+        input.agentCard ? JSON.stringify(input.agentCard) : null
       ],
       client
     )
@@ -126,7 +124,8 @@ export async function createAgent(input: CreateAgentInput): Promise<AgentWithPar
     if (!participantId) throw new Error('Failed to create agent participant')
 
     return { ...agent, participant_id: participantId }
-  })
+  }
+  return outerClient ? run(outerClient) : withTransaction(run)
 }
 
 export async function updateAgentStatus(
@@ -173,24 +172,26 @@ export const DEFAULT_AGENTS: DefaultAgentSpec[] = [
 ]
 
 /** Ensure the default agent roster exists for a workspace (idempotent). */
-export async function ensureDefaultAgents(workspaceId: string, createdBy?: string | null): Promise<AgentWithParticipant[]> {
+export async function ensureDefaultAgents(workspaceId: string, client?: Queryable): Promise<AgentWithParticipant[]> {
   const result: AgentWithParticipant[] = []
   for (const spec of DEFAULT_AGENTS) {
-    const existing = await getAgentBySlug(workspaceId, spec.slug)
+    const existing = await getAgentBySlug(workspaceId, spec.slug, client)
     if (existing) {
       result.push(existing)
       continue
     }
     result.push(
-      await createAgent({
-        workspaceId,
-        slug: spec.slug,
-        displayName: spec.displayName,
-        role: spec.role,
-        description: spec.description,
-        color: spec.color,
-        ...(createdBy ? { createdBy } : {})
-      })
+      await createAgent(
+        {
+          workspaceId,
+          slug: spec.slug,
+          displayName: spec.displayName,
+          role: spec.role,
+          description: spec.description,
+          color: spec.color
+        },
+        client
+      )
     )
   }
   return result

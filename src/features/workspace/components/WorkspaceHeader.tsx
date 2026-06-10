@@ -1,22 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { routes } from '../../../app/router/routes'
 import { logout } from '../../../shared/api/authApi'
 import { useAuthStore } from '../../../shared/stores/authStore'
 import { formatDisplayName } from '../../../shared/utils/displayName'
+import { agentRoleLabel } from '../../agents/agentDisplay'
+import { agentIdentityToProfile } from '../../../shared/api/profiles'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
-import { Copy, Check, LogOut, LayoutGrid, User, KeyRound, ChevronDown } from 'lucide-react'
+import { Copy, Check, LogOut, User, KeyRound, ChevronDown } from 'lucide-react'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate()
   const { data: workspaces = [] } = useWorkspacesQuery()
-  const user = useAuthStore((state) => state.user)
+  const identity = useAuthStore((state) => state.identity)
   const reset = useAuthStore((state) => state.reset)
   const [copied, setCopied] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const workspace = workspaces.find((item) => item.id === workspaceId)
-  const displayName = formatDisplayName(user?.displayName ?? user?.email)
+  const displayName = formatDisplayName(identity?.displayName)
+  const chipColor = identity ? agentIdentityToProfile(identity).color : '#94a3b8'
+  const identityLabel = identity
+    ? `${identity.role ? agentRoleLabel(identity.role) : '외부 에이전트'} · @${identity.slug}`
+    : ''
   const menuRef = useRef<HTMLDivElement>(null)
   const inviteRef = useRef<HTMLDivElement>(null)
 
@@ -55,13 +61,13 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
         <p className="eyebrow">현재 워크스페이스</p>
         <h2>{workspace?.name ?? '워크스페이스'}</h2>
       </div>
-      
+
       <div className="header-actions">
         {workspace?.inviteCode && (
           <div className="dropdown-container" ref={inviteRef}>
-            <button 
-              className={inviteOpen ? 'invite-trigger open' : 'invite-trigger'} 
-              onClick={() => setInviteOpen(!inviteOpen)} 
+            <button
+              className={inviteOpen ? 'invite-trigger open' : 'invite-trigger'}
+              onClick={() => setInviteOpen(!inviteOpen)}
               aria-expanded={inviteOpen}
               aria-label="초대 코드 보기"
               type="button"
@@ -85,30 +91,25 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
           </div>
         )}
 
-        <Link className="workspace-switch-link" to={routes.workspaces}>
-          <LayoutGrid size={15} />
-          <span>워크스페이스 목록</span>
-        </Link>
-
         <div className="dropdown-container" ref={menuRef}>
-          <button 
-            className="user-menu-button" 
+          <button
+            className="user-menu-button"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-expanded={menuOpen}
-            aria-label="사용자 메뉴"
+            aria-label="에이전트 메뉴"
             type="button"
           >
-            <span className="user-chip" style={{ ['--chip-color' as string]: user?.color ?? '#94a3b8' }}>
+            <span className="user-chip" style={{ ['--chip-color' as string]: chipColor }}>
               <User size={14} style={{ marginRight: '6px' }} />
               {displayName}
             </span>
           </button>
-          
+
           {menuOpen && (
             <div className="dropdown-menu">
               <div className="dropdown-item user-info">
                 <strong>{displayName}</strong>
-                <small>{user?.email}</small>
+                <small>{identityLabel}</small>
               </div>
               <div className="dropdown-divider"></div>
               <button className="dropdown-item text-danger" onClick={signOut} type="button">

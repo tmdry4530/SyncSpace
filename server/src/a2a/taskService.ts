@@ -1,4 +1,4 @@
-import { withTransaction } from '../db/query.js'
+import { withTransaction, type Queryable } from '../db/query.js'
 import {
   appendEvent,
   createContext,
@@ -14,6 +14,8 @@ import {
   type A2aTaskRow
 } from '../db/repositories/a2aRepository.js'
 import { enqueueJob } from '../db/repositories/jobRepository.js'
+import { getChannelWorkspaceId } from '../db/repositories/channelRepository.js'
+import { getDocumentWorkspaceId } from '../db/repositories/documentRepository.js'
 import {
   buildArtifactUpdateEvent,
   buildStatusUpdateEvent,
@@ -25,7 +27,9 @@ import { isTerminalState, type A2aMessage, type A2aTaskState, type Part, type Ta
 
 export interface CreateTaskInput {
   workspaceId: string
-  agentId: string
+  /** Exactly one of agentId / remoteAgentId must be set (DB enforces the XOR). */
+  agentId?: string
+  remoteAgentId?: string
   contextId?: string | null
   channelId?: string | null
   documentId?: string | null
@@ -50,6 +54,19 @@ export async function assembleTask(taskId: string): Promise<Task | null> {
 }
 
 export async function createTaskFromMessage(input: CreateTaskInput): Promise<CreateTaskResult> {
+  // Bind only channels/documents that belong to this workspace. Callers authorize
+  // the *workspace* but pass channelId/documentId straight from request bodies or
+  // A2A metadata; without this check a member of workspace A could bind a task to
+  // workspace B's channel and read/leak its chat (cross-workspace IDOR).
+  if (input.channelId) {
+    const channelWorkspaceId = await getChannelWorkspaceId(input.channelId)
+    if (channelWorkspaceId !== input.workspaceId) throw new Error('Channel does not belong to this workspace')
+  }
+  if (input.documentId) {
+    const documentWorkspaceId = await getDocumentWorkspaceId(input.documentId)
+    if (documentWorkspaceId !== input.workspaceId) throw new Error('Document does not belong to this workspace')
+  }
+
   // messageId idempotency within an existing context. Verify the context belongs
   // to the caller's workspace BEFORE the lookup so the idempotency fast-path can
   // never disclose another workspace's task (IDOR via attacker-supplied contextId).
@@ -87,7 +104,8 @@ export async function createTaskFromMessage(input: CreateTaskInput): Promise<Cre
         workspaceId: input.workspaceId,
         channelId: input.channelId ?? null,
         documentId: input.documentId ?? null,
-        agentId: input.agentId,
+        agentId: input.agentId ?? null,
+        remoteAgentId: input.remoteAgentId ?? null,
         title: input.title ?? null,
         createdByParticipantId: input.createdByParticipantId ?? null,
         ...(input.acceptedOutputModes ? { acceptedOutputModes: input.acceptedOutputModes } : {})
@@ -115,7 +133,11 @@ export async function createTaskFromMessage(input: CreateTaskInput): Promise<Cre
     )
 
     if (input.enqueue !== false) {
-      await enqueueJob({ queueName: 'agent', jobType: 'agent_task', payload: { taskId: task.id } }, client)
+      if (input.remoteAgentId) {
+        await enqueueJob({ queueName: 'remote', jobType: 'remote_a2a_send', payload: { taskId: task.id } }, client)
+      } else {
+        await enqueueJob({ queueName: 'agent', jobType: 'agent_task', payload: { taskId: task.id } }, client)
+      }
     }
     return task
   })
@@ -143,13 +165,23 @@ export async function setTaskStatus(
   })
 }
 
-/** Upsert an artifact and emit an artifact_update event. */
+/** Run `fn` on the supplied client, or in a fresh transaction when none is given. */
+async function withClient<T>(client: Queryable | undefined, fn: (tx: Queryable) => Promise<T>): Promise<T> {
+  return client ? fn(client) : withTransaction(fn)
+}
+
+/**
+ * Upsert an artifact and emit an artifact_update event. Pass `client` to run inside
+ * a caller's transaction (e.g. atomically with a dedup claim) so a write failure
+ * rolls the claim back instead of permanently swallowing the artifact.
+ */
 export async function addTaskArtifact(
   taskId: string,
   contextId: string,
-  artifact: { artifactId: string; name?: string | null; description?: string | null; parts: Part[]; metadata?: Record<string, unknown> }
+  artifact: { artifactId: string; name?: string | null; description?: string | null; parts: Part[]; metadata?: Record<string, unknown> },
+  client?: Queryable
 ): Promise<void> {
-  await withTransaction(async (client) => {
+  await withClient(client, async (tx) => {
     const row = await upsertArtifact(
       {
         taskId,
@@ -159,12 +191,12 @@ export async function addTaskArtifact(
         parts: artifact.parts,
         ...(artifact.metadata ? { metadata: artifact.metadata } : {})
       },
-      client
+      tx
     )
     const event = buildArtifactUpdateEvent(taskId, contextId, mapArtifactRowToA2aArtifact(row))
     await appendEvent(
       { taskId, contextId, eventType: 'artifact_update', payload: event as unknown as Record<string, unknown> },
-      client
+      tx
     )
   })
 }
@@ -173,9 +205,10 @@ export async function addTaskArtifact(
 export async function addAgentMessage(
   taskId: string,
   contextId: string,
-  message: { messageId: string; parts: Part[]; participantId?: string | null; metadata?: Record<string, unknown> }
+  message: { messageId: string; parts: Part[]; participantId?: string | null; metadata?: Record<string, unknown> },
+  client?: Queryable
 ): Promise<void> {
-  await withTransaction(async (client) => {
+  await withClient(client, async (tx) => {
     const row = await insertA2aMessage(
       {
         messageId: message.messageId,
@@ -186,7 +219,7 @@ export async function addAgentMessage(
         parts: message.parts,
         ...(message.metadata ? { metadata: message.metadata } : {})
       },
-      client
+      tx
     )
     await appendEvent(
       {
@@ -195,7 +228,7 @@ export async function addAgentMessage(
         eventType: 'message',
         payload: mapMessageRowToA2aMessage(row) as unknown as Record<string, unknown>
       },
-      client
+      tx
     )
   })
 }

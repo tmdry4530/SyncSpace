@@ -21,8 +21,7 @@ function ServerRealtimeBridge() {
 }
 
 function AuthBootstrap({ children }: PropsWithChildren) {
-  const setUser = useAuthStore((state) => state.setUser)
-  const setParticipantId = useAuthStore((state) => state.setParticipantId)
+  const setIdentity = useAuthStore((state) => state.setIdentity)
   const setLoading = useAuthStore((state) => state.setLoading)
 
   useEffect(() => {
@@ -31,13 +30,11 @@ function AuthBootstrap({ children }: PropsWithChildren) {
     fetchMe()
       .then((session) => {
         if (!alive) return
-        setUser(session.user)
-        setParticipantId(session.participantId)
+        setIdentity(session.identity)
       })
       .catch(() => {
         if (!alive) return
-        setUser(null)
-        setParticipantId(null)
+        setIdentity(null)
       })
       .finally(() => {
         if (alive) setLoading(false)
@@ -46,7 +43,7 @@ function AuthBootstrap({ children }: PropsWithChildren) {
     return () => {
       alive = false
     }
-  }, [setLoading, setUser, setParticipantId])
+  }, [setLoading, setIdentity])
 
   return <>{children}</>
 }

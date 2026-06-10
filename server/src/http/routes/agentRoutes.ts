@@ -11,6 +11,7 @@ import {
   toAgentProfile
 } from '../../db/repositories/agentRepository.js'
 import { getTask, listEvents, listTasks } from '../../db/repositories/a2aRepository.js'
+import { resolveAgentByMention } from '../../agents/resolver.js'
 import { mapTaskRowToA2aTask, mapEventRowToStreamResponse } from '../../a2a/mapper.js'
 import { assembleTask, cancelTask, createTaskFromMessage } from '../../a2a/taskService.js'
 
@@ -46,7 +47,7 @@ export function registerAgentRoutes(router: Router, config: ServerConfig): void 
     const agentId = ctx.params.agentId ?? ''
     const agent = await getAgentById(agentId)
     if (!agent) throw notFound('에이전트를 찾을 수 없습니다.')
-    const { session } = await requireWorkspaceMember(ctx, config, agent.workspace_id)
+    const { auth } = await requireWorkspaceMember(ctx, config, agent.workspace_id)
 
     const body = await ctx.json<{ content?: string; channelId?: string; documentId?: string; contextId?: string }>()
     const content = typeof body.content === 'string' ? body.content.trim() : ''
@@ -55,13 +56,46 @@ export function registerAgentRoutes(router: Router, config: ServerConfig): void 
     const result = await createTaskFromMessage({
       workspaceId: agent.workspace_id,
       agentId: agent.id,
-      createdByParticipantId: session.participantId,
+      createdByParticipantId: auth.participantId,
       ...(body.channelId ? { channelId: body.channelId } : {}),
       ...(body.documentId ? { documentId: body.documentId } : {}),
       ...(body.contextId ? { contextId: body.contextId } : {}),
       message: { messageId: newUuid(), parts: [{ text: content }], role: 'ROLE_USER' }
     })
     return json({ task: result.task })
+  })
+
+  // Unified @mention invoke: server resolves slug → internal (wins) or remote agent,
+  // enforces remote gating (verified + healthy), and routes to the right task pipeline.
+  router.post('/api/workspaces/:workspaceId/invoke', async (ctx) => {
+    const workspaceId = ctx.params.workspaceId ?? ''
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId)
+    const body = await ctx.json<{ slug?: string; content?: string; channelId?: string; documentId?: string }>()
+    const slug = typeof body.slug === 'string' ? body.slug.trim().toLowerCase() : ''
+    const content = typeof body.content === 'string' ? body.content.trim() : ''
+    if (!slug) throw badRequest('missing_slug', '에이전트 슬러그가 필요합니다.')
+    if (!content) throw badRequest('missing_content', '요청 내용이 필요합니다.')
+
+    const resolved = await resolveAgentByMention(workspaceId, slug)
+    if (!resolved) throw notFound('해당 슬러그의 에이전트를 찾을 수 없습니다.')
+    if (resolved.kind === 'remote') {
+      if (resolved.agent.verification_status !== 'verified') throw badRequest('not_verified', '검증되지 않은 원격 에이전트는 호출할 수 없습니다.')
+      if (resolved.agent.health_status === 'unhealthy') throw badRequest('unhealthy', '비정상 상태의 원격 에이전트는 호출할 수 없습니다.')
+    }
+
+    const message = { messageId: newUuid(), parts: [{ text: content }], role: 'ROLE_USER' as const }
+    const common = {
+      workspaceId,
+      createdByParticipantId: auth.participantId,
+      ...(body.channelId ? { channelId: body.channelId } : {}),
+      ...(body.documentId ? { documentId: body.documentId } : {}),
+      message
+    }
+    const result =
+      resolved.kind === 'internal'
+        ? await createTaskFromMessage({ ...common, agentId: resolved.agent.id })
+        : await createTaskFromMessage({ ...common, remoteAgentId: resolved.agent.id })
+    return json({ task: result.task, kind: resolved.kind })
   })
 
   // Task detail: status + artifacts + history + visible event timeline.

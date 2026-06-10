@@ -1,12 +1,11 @@
 import type { Workspace } from '../../types/contracts.js'
-import { query, queryOne, withTransaction } from '../query.js'
+import { query, queryOne } from '../query.js'
 import type { Queryable } from '../query.js'
-import { getHumanParticipantByUserId } from './participantRepository.js'
 
 interface WorkspaceRow {
   id: string
   name: string
-  owner_id: string
+  owner_participant_id: string | null
   invite_code: string
   created_at: string
 }
@@ -15,22 +14,23 @@ function toWorkspace(row: WorkspaceRow): Workspace {
   return {
     id: row.id,
     name: row.name,
-    ownerId: row.owner_id,
+    ownerParticipantId: row.owner_participant_id,
     inviteCode: row.invite_code,
     createdAt: row.created_at
   }
 }
 
-const WORKSPACE_COLUMNS = `id, name, owner_id, invite_code, created_at`
+const WORKSPACE_COLUMNS = `id, name, owner_participant_id, invite_code, created_at`
 
-export async function listWorkspacesForUser(userId: string, client?: Queryable): Promise<Workspace[]> {
+/** Workspaces the given participant belongs to (its own working environment). */
+export async function listWorkspacesForParticipant(participantId: string, client?: Queryable): Promise<Workspace[]> {
   const rows = await query<WorkspaceRow>(
     `select ${WORKSPACE_COLUMNS.split(',').map((c) => `w.${c.trim()}`).join(', ')}
      from workspaces w
      join workspace_members wm on wm.workspace_id = w.id
-     where wm.user_id = $1
+     where wm.participant_id = $1
      order by w.created_at asc`,
-    [userId],
+    [participantId],
     client
   )
   return rows.map(toWorkspace)
@@ -49,45 +49,50 @@ export interface MembershipRow {
 
 export async function getMembership(
   workspaceId: string,
-  userId: string,
+  participantId: string,
   client?: Queryable
 ): Promise<MembershipRow | null> {
   return queryOne<MembershipRow>(
-    `select role, member_role, participant_id from workspace_members where workspace_id = $1 and user_id = $2`,
-    [workspaceId, userId],
+    `select role, member_role, participant_id from workspace_members where workspace_id = $1 and participant_id = $2`,
+    [workspaceId, participantId],
     client
   )
 }
 
-export async function createWorkspace(input: { name: string; ownerId: string }): Promise<Workspace> {
+export async function createWorkspace(
+  input: { name: string; ownerParticipantId?: string | null },
+  client?: Queryable
+): Promise<Workspace> {
   const rows = await query<WorkspaceRow>(
-    `insert into workspaces (name, owner_id) values ($1, $2) returning ${WORKSPACE_COLUMNS}`,
-    [input.name, input.ownerId]
+    `insert into workspaces (name, owner_participant_id) values ($1, $2) returning ${WORKSPACE_COLUMNS}`,
+    [input.name, input.ownerParticipantId ?? null],
+    client
   )
   const row = rows[0]
   if (!row) throw new Error('Failed to create workspace')
   return toWorkspace(row)
 }
 
-export async function joinWorkspaceByInviteCode(input: { inviteCode: string; userId: string }): Promise<Workspace | null> {
-  return withTransaction(async (client) => {
-    const workspace = await queryOne<WorkspaceRow>(
-      `select ${WORKSPACE_COLUMNS} from workspaces where upper(invite_code) = upper($1)`,
-      [input.inviteCode],
-      client
-    )
-    if (!workspace) return null
+export async function setWorkspaceOwner(
+  workspaceId: string,
+  participantId: string,
+  client?: Queryable
+): Promise<void> {
+  await query(`update workspaces set owner_participant_id = $2 where id = $1`, [workspaceId, participantId], client)
+}
 
-    const participant = await getHumanParticipantByUserId(input.userId, client)
-    await query(
-      `insert into workspace_members (workspace_id, user_id, role, member_role, participant_id)
-       values ($1, $2, 'member', 'member', $3)
-       on conflict (workspace_id, user_id) do nothing`,
-      [workspace.id, input.userId, participant?.id ?? null],
-      client
-    )
-    return toWorkspace(workspace)
-  })
+export async function addWorkspaceMember(
+  input: { workspaceId: string; participantId: string; role?: 'owner' | 'member' },
+  client?: Queryable
+): Promise<void> {
+  const role = input.role ?? 'member'
+  await query(
+    `insert into workspace_members (workspace_id, participant_id, role, member_role)
+     values ($1, $2, $3, $4::workspace_member_role)
+     on conflict (workspace_id, participant_id) do nothing`,
+    [input.workspaceId, input.participantId, role, role],
+    client
+  )
 }
 
 export async function deleteWorkspace(workspaceId: string, client?: Queryable): Promise<void> {

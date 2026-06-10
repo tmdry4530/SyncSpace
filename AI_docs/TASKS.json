@@ -29,13 +29,14 @@
     },
     {
       "id": "G02",
-      "title": "Supabase schema/RLS",
+      "title": "Postgres schema/agent credentials",
       "status": "todo",
       "tasks": [
-        "migration",
+        "migrations",
         "indexes",
-        "membership function",
-        "RLS policies",
+        "agent_tokens",
+        "remote_agent_tokens",
+        "participant workspace membership",
         "seed optional"
       ]
     },
@@ -60,7 +61,7 @@
         "providers",
         "router",
         "guards",
-        "supabase client",
+        "agent credential client",
         "shared UI",
         "auth pages"
       ]
@@ -119,7 +120,7 @@
       "title": "Presence/connection UX",
       "status": "todo",
       "tasks": [
-        "user colors",
+        "participant colors",
         "PresenceBar",
         "awareness wiring",
         "toasts",

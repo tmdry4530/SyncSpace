@@ -4,14 +4,16 @@ import { useAgentTasksQuery } from '../queries/useAgentTasksQuery'
 import { AgentStatusBadge } from './AgentStatusBadge'
 import { AgentTaskList } from './AgentTaskList'
 import { agentRoleLabel } from '../agentDisplay'
+import { RemoteAgentDirectory } from '../../remote-agents/components/RemoteAgentDirectory'
 
 interface AgentRailProps {
   workspaceId: string
+  channelId?: string | null | undefined
   activeTaskId?: string | null
   onSelectTask: (taskId: string) => void
 }
 
-export function AgentRail({ workspaceId, activeTaskId, onSelectTask }: AgentRailProps) {
+export function AgentRail({ workspaceId, channelId, activeTaskId, onSelectTask }: AgentRailProps) {
   const { data: agents = [], isLoading: agentsLoading } = useAgentsQuery(workspaceId)
   const { data: tasks = [], isLoading: tasksLoading } = useAgentTasksQuery(workspaceId)
 
@@ -43,6 +45,8 @@ export function AgentRail({ workspaceId, activeTaskId, onSelectTask }: AgentRail
           ))}
         </ul>
       </section>
+
+      <RemoteAgentDirectory workspaceId={workspaceId} channelId={channelId} />
 
       <section className="agent-rail-section">
         <h2>최근 작업</h2>

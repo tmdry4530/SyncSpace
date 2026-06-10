@@ -1,15 +1,13 @@
 import type { ServerConfig } from '../../config.js'
 import type { Router } from '../router.js'
-import { json, noContent } from '../response.js'
+import { json } from '../response.js'
 import { badRequest, notFound } from '../errors.js'
-import { requireSession, requireWorkspaceMember } from '../../auth/middleware.js'
+import { requireAuth, requireWorkspaceMember } from '../../auth/middleware.js'
 import { hashIp } from '../../utils/crypto.js'
 import {
-  createWorkspace,
   deleteWorkspace,
   getWorkspaceById,
-  joinWorkspaceByInviteCode,
-  listWorkspacesForUser
+  listWorkspacesForParticipant
 } from '../../db/repositories/workspaceRepository.js'
 import { createChannel, listChannels } from '../../db/repositories/channelRepository.js'
 import { createDocument, listDocuments } from '../../db/repositories/documentRepository.js'
@@ -27,54 +25,19 @@ function requiredString(value: unknown, field: string, max = 200): string {
 
 export function registerWorkspaceRoutes(router: Router, config: ServerConfig): void {
   router.get('/api/workspaces', async (ctx) => {
-    const session = await requireSession(ctx, config)
-    return json({ workspaces: await listWorkspacesForUser(session.userId) })
-  })
-
-  router.post('/api/workspaces', async (ctx) => {
-    const session = await requireSession(ctx, config)
-    const body = await ctx.json<{ name?: string }>()
-    const name = requiredString(body.name, '워크스페이스 이름', 120)
-    const workspace = await createWorkspace({ name, ownerId: session.userId })
-    await writeAuditLog({
-      workspaceId: workspace.id,
-      actorParticipantId: session.participantId,
-      action: 'workspace.create',
-      resourceType: 'workspace',
-      resourceId: workspace.id,
-      ipHash: hashIp(ctx.ip, config.authSecret),
-      userAgent: ctx.header('user-agent')
-    })
-    return json({ workspace })
-  })
-
-  router.post('/api/workspaces/join', async (ctx) => {
-    const session = await requireSession(ctx, config)
-    const body = await ctx.json<{ inviteCode?: string }>()
-    const inviteCode = requiredString(body.inviteCode, '초대 코드', 40)
-    const workspace = await joinWorkspaceByInviteCode({ inviteCode, userId: session.userId })
-    if (!workspace) throw notFound('초대 코드에 해당하는 워크스페이스를 찾을 수 없습니다.', 'invalid_invite_code')
-    await writeAuditLog({
-      workspaceId: workspace.id,
-      actorParticipantId: session.participantId,
-      action: 'workspace.join',
-      resourceType: 'workspace',
-      resourceId: workspace.id,
-      ipHash: hashIp(ctx.ip, config.authSecret),
-      userAgent: ctx.header('user-agent')
-    })
-    return json({ workspace })
+    const auth = await requireAuth(ctx, config)
+    return json({ workspaces: await listWorkspacesForParticipant(auth.participantId) })
   })
 
   router.delete('/api/workspaces/:workspaceId', async (ctx) => {
     const workspaceId = ctx.params.workspaceId ?? ''
-    const { session } = await requireWorkspaceMember(ctx, config, workspaceId, 'owner')
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId, 'owner')
     const workspace = await getWorkspaceById(workspaceId)
     if (!workspace) throw notFound('워크스페이스를 찾을 수 없습니다.')
     await deleteWorkspace(workspaceId)
     await writeAuditLog({
       workspaceId,
-      actorParticipantId: session.participantId,
+      actorParticipantId: auth.participantId,
       action: 'workspace.delete',
       resourceType: 'workspace',
       resourceId: workspaceId,
@@ -92,13 +55,13 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
 
   router.post('/api/workspaces/:workspaceId/channels', async (ctx) => {
     const workspaceId = ctx.params.workspaceId ?? ''
-    const { session } = await requireWorkspaceMember(ctx, config, workspaceId)
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId)
     const body = await ctx.json<{ name?: string }>()
     const name = requiredString(body.name, '채널 이름', 80)
-    const channel = await createChannel({ workspaceId, name, createdBy: session.userId })
+    const channel = await createChannel({ workspaceId, name, createdBy: auth.participantId })
     await writeAuditLog({
       workspaceId,
-      actorParticipantId: session.participantId,
+      actorParticipantId: auth.participantId,
       action: 'channel.create',
       resourceType: 'channel',
       resourceId: channel.id,
@@ -116,13 +79,13 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
 
   router.post('/api/workspaces/:workspaceId/documents', async (ctx) => {
     const workspaceId = ctx.params.workspaceId ?? ''
-    const { session } = await requireWorkspaceMember(ctx, config, workspaceId)
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId)
     const body = await ctx.json<{ title?: string }>()
     const title = requiredString(body.title, '문서 제목', 160)
-    const document = await createDocument({ workspaceId, title, createdBy: session.userId })
+    const document = await createDocument({ workspaceId, title, createdBy: auth.participantId })
     await writeAuditLog({
       workspaceId,
-      actorParticipantId: session.participantId,
+      actorParticipantId: auth.participantId,
       action: 'document.create',
       resourceType: 'document',
       resourceId: document.id,
@@ -150,5 +113,3 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
     return json(page)
   })
 }
-
-export { noContent }

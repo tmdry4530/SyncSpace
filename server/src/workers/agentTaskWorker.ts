@@ -6,8 +6,10 @@ import { persistMessage } from '../db/repositories/messageRepository.js'
 import { touchDocument } from '../db/repositories/documentRepository.js'
 import { addAgentMessage, addTaskArtifact, setTaskStatus } from '../a2a/taskService.js'
 import { isTerminalState, type A2aMessage, type A2aTaskState, type Part } from '../a2a/types.js'
-import { getAgentRuntime, resolveRuntimeMode } from '../agents/registry.js'
+import { getAgentRuntime } from '../agents/registry.js'
 import type { AgentEmitter, AgentRunContext } from '../agents/runtime.js'
+import { dispatchAgentMentions, readHops } from '../agents/mentionDispatcher.js'
+import { buildChannelTranscript } from '../agents/conversation.js'
 import { enqueuePushForTask } from './pushNotificationWorker.js'
 
 const AGENT_TASK_TIMEOUT_MS = 60_000
@@ -34,6 +36,7 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
 
   const task = await getTask(taskId)
   if (!task || isTerminalState(task.status_state)) return
+  if (!task.agent_id) return // remote-agent tasks are driven by the remote worker, not this one
 
   const agent = await getAgentById(task.agent_id)
   if (!agent) {
@@ -41,8 +44,12 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
     return
   }
 
-  // Reconstruct the originating user message text from the task history.
-  const userText = await firstUserMessageText(taskId)
+  // Reconstruct the originating user message (text + collaboration hop count).
+  const { text: userText, hops } = await originatingUserMessage(taskId)
+  // Recent channel chat gives the agent conversational context for collaboration.
+  const conversationText = task.channel_id
+    ? await buildChannelTranscript(task.channel_id, 6_000, task.workspace_id).catch(() => null)
+    : null
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), AGENT_TASK_TIMEOUT_MS)
 
@@ -65,9 +72,10 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
       await addAgentMessage(taskId, task.context_id, { messageId, parts, participantId: agent.participant_id })
       // Mirror a short summary into the channel chat as the agent participant.
       if (task.channel_id) {
+        const content = firstText(parts).slice(0, 4000) || '(agent message)'
         await persistMessage({
           channelId: task.channel_id,
-          content: firstText(parts).slice(0, 4000) || '(agent message)',
+          content,
           authorParticipantId: agent.participant_id,
           authorType: 'agent',
           agentId: agent.id,
@@ -75,6 +83,16 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
           clientId: `a2a:${messageId}`,
           metadata: { taskId, source: 'agent' }
         }).catch((error) => deps.logger.warn('Failed to mirror agent chat message', { taskId, error: String(error) }))
+        // Agent-to-agent collaboration: @mentions in agent output activate teammates.
+        await dispatchAgentMentions({
+          workspaceId: task.workspace_id,
+          channelId: task.channel_id,
+          content,
+          authorParticipantId: agent.participant_id,
+          authorInternalAgentId: agent.id,
+          hops,
+          logger: deps.logger
+        })
       }
     },
     appendDocument: async (markdown: string) => {
@@ -101,13 +119,14 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
     documentId: task.document_id,
     agentRole: agent.role,
     userMessageText: userText,
+    conversationText,
     emit,
     signal: controller.signal
   }
 
   try {
     await updateAgentStatus(agent.id, 'running')
-    await getAgentRuntime(agent.role, resolveRuntimeMode()).run(ctx)
+    await getAgentRuntime(agent.role).run(ctx)
     const finalTask = await getTask(taskId)
     if (finalTask && !isTerminalState(finalTask.status_state)) {
       await setTaskStatus(taskId, 'TASK_STATE_COMPLETED', statusMessage('완료되었습니다.'))
@@ -125,10 +144,10 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
   }
 }
 
-async function firstUserMessageText(taskId: string): Promise<string> {
+async function originatingUserMessage(taskId: string): Promise<{ text: string; hops: number }> {
   const messages = await listA2aMessages(taskId)
   const userMessage = messages.find((message) => message.role === 'ROLE_USER')
-  if (!userMessage) return ''
+  if (!userMessage) return { text: '', hops: 0 }
   const parts = (userMessage.parts as Part[]) ?? []
-  return firstText(parts)
+  return { text: firstText(parts), hops: readHops(userMessage.metadata) }
 }

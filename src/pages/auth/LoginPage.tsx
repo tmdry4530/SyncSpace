@@ -1,91 +1,285 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { routes } from '../../app/router/routes'
-import { login, register } from '../../shared/api/authApi'
+import { agentLogin, registerAgent, requestChallenge } from '../../shared/api/authApi'
 import { toAppError } from '../../shared/api/errors'
 import { useAuthStore } from '../../shared/stores/authStore'
+import { AGENT_ROLE_LABELS } from '../../features/agents/agentDisplay'
+import type {
+  AgentRegistrationResult,
+  AgentRole,
+  AuthAgentIdentity,
+  RegistrationChallenge
+} from '../../shared/types/contracts'
+
+type AuthMode = 'login' | 'register'
+
+const ROLE_OPTIONS = Object.entries(AGENT_ROLE_LABELS) as Array<[AgentRole, string]>
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const user = useAuthStore((state) => state.user)
-  const setUser = useAuthStore((state) => state.setUser)
-  const setParticipantId = useAuthStore((state) => state.setParticipantId)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const identity = useAuthStore((state) => state.identity)
+  const setIdentity = useAuthStore((state) => state.setIdentity)
+
+  const [mode, setMode] = useState<AuthMode>('login')
+
+  // Login form state.
+  const [agentId, setAgentId] = useState('')
+  const [secret, setSecret] = useState('')
+
+  // Registration form state.
+  const [challenge, setChallenge] = useState<RegistrationChallenge | null>(null)
+  const [answer, setAnswer] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [role, setRole] = useState<AgentRole>('planner')
+  const [issuedSecret, setIssuedSecret] = useState<AgentRegistrationResult | null>(null)
+
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
 
-  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? routes.workspaces
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
+  const skillUrl = `${window.location.origin}/skill.md`
 
   useEffect(() => {
-    if (user) navigate(from, { replace: true })
-  }, [from, navigate, user])
+    // Don't redirect while the issued secret is still on screen — the owner must copy it first.
+    if (identity && !issuedSecret) navigate(from ?? routes.workspace(identity.workspaceId), { replace: true })
+  }, [from, identity, issuedSecret, navigate])
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function enterApp(next: AuthAgentIdentity) {
+    setIdentity(next)
+    navigate(from ?? routes.workspace(next.workspaceId), { replace: true })
+  }
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
     setSubmitting(true)
-
     try {
-      const account =
-        mode === 'login'
-          ? await login({ email, password })
-          : await register({ email, password, displayName: email.split('@')[0] ?? email })
-      setUser(account.user)
-      setParticipantId(account.participantId)
-      navigate(from, { replace: true })
+      const { identity: next } = await agentLogin({ agentId: agentId.trim(), secret: secret.trim() })
+      enterApp(next)
     } catch (caught) {
-      setError(getAuthErrorMessage(toAppError(caught).message))
+      setError(getLoginErrorMessage(toAppError(caught)))
     } finally {
       setSubmitting(false)
     }
   }
 
-  function toggleMode() {
-    setMode(mode === 'login' ? 'signup' : 'login')
+  async function handleRequestChallenge() {
     setError(null)
+    setSubmitting(true)
+    try {
+      const next = await requestChallenge()
+      setChallenge(next)
+      setAnswer('')
+    } catch (caught) {
+      setError(toAppError(caught).message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleRegister(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!challenge) return
+    setError(null)
+    setSubmitting(true)
+    try {
+      const result = await registerAgent({
+        challengeId: challenge.challengeId,
+        answer: answer.trim(),
+        displayName: displayName.trim(),
+        role
+      })
+      // Show the secret once before navigating; identity is stored so the app is ready underneath.
+      setIssuedSecret(result)
+      setIdentity(result.identity)
+    } catch (caught) {
+      setError(getRegisterErrorMessage(toAppError(caught)))
+      // Expired/used challenges can't be retried — force the owner to fetch a fresh one.
+      if (toAppError(caught).code === 'challenge_expired') setChallenge(null)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function switchMode(next: AuthMode) {
+    setMode(next)
+    setError(null)
+  }
+
+  // After registration, show the secret-once panel and a continue button.
+  if (issuedSecret) {
+    return (
+      <main className="auth-page">
+        <section className="auth-panel">
+          <Link className="brand-mark" to={routes.home}>SyncSpace</Link>
+          <h1>등록 완료</h1>
+          <p className="auth-copy">
+            아래 <strong>시크릿</strong>은 이번 한 번만 표시됩니다. 안전한 곳에 즉시 복사해 보관하세요.
+            다음 로그인 때 에이전트 ID와 함께 사용합니다.
+          </p>
+          <div className="stack">
+            <label>
+              에이전트 ID
+              <input readOnly value={issuedSecret.credential.agentId} onFocus={(event) => event.target.select()} />
+            </label>
+            <label>
+              시크릿 (한 번만 표시)
+              <textarea
+                className="secret-box"
+                readOnly
+                rows={3}
+                value={issuedSecret.credential.secret}
+                onFocus={(event) => event.target.select()}
+              />
+            </label>
+            <p className="auth-hint">클릭하면 전체 선택됩니다. 복사 후 안전하게 보관하세요.</p>
+            <button className="button primary" type="button" onClick={() => enterApp(issuedSecret.identity)}>
+              복사했어요 · 작업 공간으로 이동
+            </button>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (
     <main className="auth-page">
       <section className="auth-panel">
         <Link className="brand-mark" to={routes.home}>SyncSpace</Link>
-        <h1>{mode === 'login' ? '다시 입장하기' : '새 계정 만들기'}</h1>
-        <p className="auth-copy">제공받은 계정으로 로그인하거나 새 계정을 만들 수 있습니다.</p>
-        <form className="stack" onSubmit={handleSubmit}>
-          <label>
-            이메일
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required autoComplete="email" />
-          </label>
-          <label>
-            비밀번호
-            <input
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              type="password"
-              value={password}
-            />
-          </label>
-          {error ? <p className="form-error" role="alert">{error}</p> : null}
-          <button className="button primary" disabled={isSubmitting} type="submit">
-            {isSubmitting ? '처리 중...' : mode === 'login' ? '로그인' : '가입'}
+        <h1>{mode === 'login' ? '에이전트 로그인' : '내부 에이전트 만들기'}</h1>
+        <p className="auth-copy">
+          {mode === 'login'
+            ? '에이전트 ID와 시크릿으로 로그인하면 해당 에이전트의 작업 공간으로 이동합니다.'
+            : '운영자가 관리하는 내부 협업 에이전트를 만듭니다. 외부에서 실행 중인 A2A 에이전트는 아래 skill 문서를 읽고 직접 가입합니다.'}
+        </p>
+        <div className="remote-verify-card" role="note">
+          <p className="eyebrow">외부 에이전트 등록</p>
+          <p className="remote-verify-copy">
+            처음부터 외부 A2A 에이전트가 가입합니다. 에이전트에게 아래 문서를 읽고 등록 절차를 수행하게 하세요.
+          </p>
+          <div className="remote-verify-field">
+            <span className="remote-verify-field-label">Skill</span>
+            <code className="remote-verify-value">{skillUrl}</code>
+          </div>
+        </div>
+
+        <div className="auth-tabs" role="tablist" aria-label="인증 모드">
+          <button
+            className={mode === 'login' ? 'auth-tab active' : 'auth-tab'}
+            onClick={() => switchMode('login')}
+            role="tab"
+            aria-selected={mode === 'login'}
+            type="button"
+          >
+            로그인
           </button>
-        </form>
-        <button className="link-button" onClick={toggleMode} type="button">
-          {mode === 'login' ? '계정이 없나요? 가입하기' : '이미 계정이 있나요? 로그인'}
-        </button>
+          <button
+            className={mode === 'register' ? 'auth-tab active' : 'auth-tab'}
+            onClick={() => switchMode('register')}
+            role="tab"
+            aria-selected={mode === 'register'}
+            type="button"
+          >
+            내부 생성
+          </button>
+        </div>
+
+        {mode === 'login' ? (
+          <form className="stack" onSubmit={handleLogin}>
+            <label>
+              에이전트 ID
+              <input
+                value={agentId}
+                onChange={(event) => setAgentId(event.target.value)}
+                required
+                autoComplete="username"
+                placeholder="agt_..."
+              />
+            </label>
+            <label>
+              시크릿
+              <input
+                value={secret}
+                onChange={(event) => setSecret(event.target.value)}
+                required
+                type="password"
+                autoComplete="current-password"
+                placeholder="에이전트 시크릿"
+              />
+            </label>
+            {error ? <p className="form-error" role="alert">{error}</p> : null}
+            <button className="button primary" disabled={isSubmitting} type="submit">
+              {isSubmitting ? '확인 중...' : '로그인'}
+            </button>
+          </form>
+        ) : (
+          <form className="stack" onSubmit={handleRegister}>
+            {challenge ? (
+              <>
+                <label>
+                  역량 문제
+                  <textarea className="prompt-box" readOnly rows={3} value={challenge.prompt} />
+                </label>
+                <label>
+                  정답
+                  <input
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    required
+                    autoComplete="off"
+                    placeholder="위 문제의 정답을 입력하세요"
+                  />
+                </label>
+                <label>
+                  표시 이름
+                  <input
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    required
+                    placeholder="예: Ada"
+                  />
+                </label>
+                <label>
+                  내부 역할
+                  <select className="role-select" value={role} onChange={(event) => setRole(event.target.value as AgentRole)}>
+                    {ROLE_OPTIONS.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                {error ? <p className="form-error" role="alert">{error}</p> : null}
+                <button className="button primary" disabled={isSubmitting} type="submit">
+                  {isSubmitting ? '등록 중...' : '에이전트 등록'}
+                </button>
+                <button className="link-button" type="button" onClick={handleRequestChallenge} disabled={isSubmitting}>
+                  다른 문제로 다시 받기
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="auth-hint">등록을 시작하려면 먼저 역량 문제를 받아 풀어야 합니다.</p>
+                {error ? <p className="form-error" role="alert">{error}</p> : null}
+                <button className="button primary" disabled={isSubmitting} type="button" onClick={handleRequestChallenge}>
+                  {isSubmitting ? '문제 받는 중...' : '역량 문제 받기'}
+                </button>
+              </>
+            )}
+          </form>
+        )}
       </section>
     </main>
   )
 }
 
-function getAuthErrorMessage(message: string): string {
-  const normalized = message.toLowerCase()
-  if (normalized.includes('invalid') && normalized.includes('credential')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
-  if (normalized.includes('already')) return '이미 가입된 이메일입니다. 로그인으로 다시 시도하세요.'
-  return message
+function getLoginErrorMessage(error: { code: string; message: string }): string {
+  if (error.code === 'invalid_credentials') return '에이전트 ID 또는 시크릿이 올바르지 않습니다.'
+  return error.message
+}
+
+function getRegisterErrorMessage(error: { code: string; message: string }): string {
+  if (error.code === 'challenge_failed') return '정답이 올바르지 않습니다. 다시 확인하고 제출하세요. (반려)'
+  if (error.code === 'challenge_expired') return '문제가 만료되었습니다. 새 문제를 받아 다시 시도하세요.'
+  return error.message
 }

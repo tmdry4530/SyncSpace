@@ -10,7 +10,7 @@ export interface UserProfile {
 export interface Workspace {
   id: ID
   name: string
-  ownerId: ID
+  ownerParticipantId: ID | null
   inviteCode: string
   createdAt: string
 }
@@ -82,6 +82,8 @@ export type ParticipantType = 'human' | 'agent'
 
 export type AgentRole = 'planner' | 'builder' | 'reviewer' | 'doc_writer' | 'orchestrator'
 
+export type AuthAgentKind = 'internal' | 'external'
+
 export type AgentRuntimeStatus =
   | 'idle'
   | 'running'
@@ -113,11 +115,70 @@ export interface AgentProfile {
   updatedAt: string
 }
 
-export interface AuthUser {
-  id: ID
-  email: string
+/** The logged-in identity is an agent, not a human user. */
+export interface AuthAgentIdentity {
+  kind: AuthAgentKind
+  agentId: ID
+  participantId: ID
+  workspaceId: ID
   displayName: string
-  avatarUrl: string | null
-  color: string
+  slug: string
+  role?: AgentRole
 }
 
+export interface RegistrationChallenge {
+  challengeId: ID
+  prompt: string
+  expiresAt: string
+}
+
+export interface AgentCredential {
+  agentId: ID
+  /** Raw secret — shown exactly once at registration. */
+  secret: string
+}
+
+export interface AgentRegistrationResult {
+  credential: AgentCredential
+  identity: AuthAgentIdentity
+  workspace: Workspace
+}
+
+export type RemoteVerificationStatus = 'pending' | 'verified' | 'rejected'
+export type RemoteHealthStatus = 'unknown' | 'healthy' | 'unhealthy'
+
+/** A public-safe view of a registered external (remote) agent. Never includes secrets. */
+export interface RemoteAgentProfile {
+  id: ID
+  workspaceId: ID
+  slug: string
+  name: string
+  description: string | null
+  agentCardUrl: string
+  endpointUrl: string
+  protocolVersion: string | null
+  skills: unknown[]
+  capabilities: Record<string, unknown>
+  verificationStatus: RemoteVerificationStatus
+  healthStatus: RemoteHealthStatus
+  createdAt: string
+}
+
+export interface RemoteAgentRegistrationResult {
+  id: ID
+  slug: string
+  status: RemoteVerificationStatus
+  verification: {
+    type: 'well-known'
+    url: string
+    token: string
+  }
+}
+
+export interface ExternalAgentRegistrationResult {
+  credential: AgentCredential
+  identity: AuthAgentIdentity
+  workspace: Workspace
+  agent: RemoteAgentProfile
+  verification: RemoteAgentRegistrationResult['verification']
+}

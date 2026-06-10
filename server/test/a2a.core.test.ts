@@ -1,10 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { setPool } from '../src/db/pool.js'
-import { createUserWithParticipant } from '../src/db/repositories/userRepository.js'
-import { getHumanParticipantByUserId } from '../src/db/repositories/participantRepository.js'
-import { createWorkspace } from '../src/db/repositories/workspaceRepository.js'
-import { createAgent } from '../src/db/repositories/agentRepository.js'
+import { registerAgentFixture } from './helpers/agentFixture.js'
+import { getAgentBySlug } from '../src/db/repositories/agentRepository.js'
 import { listEvents } from '../src/db/repositories/a2aRepository.js'
 import {
   addAgentMessage,
@@ -23,13 +21,12 @@ beforeAll(async () => {
   db = await startEmbeddedDatabase()
   setPool(db.pool, { external: true })
 
-  const { user } = await createUserWithParticipant({ email: 'a2a@syncspace.dev', displayName: 'A2A', passwordHash: null })
-  const participant = await getHumanParticipantByUserId(user.id)
-  participantId = participant!.id
-  const workspace = await createWorkspace({ name: 'A2A WS', ownerId: user.id })
-  workspaceId = workspace.id
-  const agent = await createAgent({ workspaceId, slug: 'planner', displayName: 'Planner', role: 'planner' })
-  agentId = agent.id
+  const reg = await registerAgentFixture({ displayName: 'A2A', slug: 'a2a-owner' })
+  workspaceId = reg.identity.workspaceId
+  // The registered owner participant authors the task; the default planner runs it.
+  participantId = reg.identity.participantId
+  const planner = await getAgentBySlug(workspaceId, 'planner')
+  agentId = planner!.id
 }, 90_000)
 
 afterAll(async () => {

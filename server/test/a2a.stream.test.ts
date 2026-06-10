@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { startTestServer, type TestServer } from './helpers/testServer.js'
-import { createUserWithParticipant } from '../src/db/repositories/userRepository.js'
-import { createWorkspace } from '../src/db/repositories/workspaceRepository.js'
-import { createAgent, createAgentToken } from '../src/db/repositories/agentRepository.js'
+import { registerAgentFixture } from './helpers/agentFixture.js'
+import { createAgentToken } from '../src/db/repositories/agentRepository.js'
 import { startJobRunner, type JobRunnerHandle } from '../src/workers/jobRunner.js'
 import { processAgentTaskJob } from '../src/workers/agentTaskWorker.js'
 import { createLogger } from '../src/utils/logger.js'
@@ -19,10 +18,10 @@ beforeAll(async () => {
   db = await startEmbeddedDatabase()
   server = await startTestServer(db)
 
-  const { user } = await createUserWithParticipant({ email: 'stream@syncspace.dev', displayName: 'Stream', passwordHash: null })
-  const workspace = await createWorkspace({ name: 'Stream WS', ownerId: user.id })
-  const agent = await createAgent({ workspaceId: workspace.id, slug: 'planner', displayName: 'Planner', role: 'planner' })
-  token = (await createAgentToken({ agentId: agent.id, scopes: ['task:read', 'task:write', 'task:cancel'], pepper: PEPPER })).token
+  const reg = await registerAgentFixture({ displayName: 'Stream', slug: 'stream-owner' })
+  token = (
+    await createAgentToken({ agentId: reg.credential.agentId, scopes: ['task:read', 'task:write', 'task:cancel'], pepper: PEPPER })
+  ).token
 
   // In-process worker so emitted events flow through Postgres NOTIFY to the SSE hub.
   worker = startJobRunner({

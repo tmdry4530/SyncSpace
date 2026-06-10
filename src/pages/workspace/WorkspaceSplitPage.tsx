@@ -176,7 +176,12 @@ export function WorkspaceSplitPage() {
           </div>
         </div>
 
-        <AgentRail workspaceId={workspaceId} activeTaskId={activeTaskId} onSelectTask={setActiveTaskId} />
+        <AgentRail
+          workspaceId={workspaceId}
+          channelId={selectedChannelId}
+          activeTaskId={activeTaskId}
+          onSelectTask={setActiveTaskId}
+        />
       </div>
 
       {activeTaskId ? (

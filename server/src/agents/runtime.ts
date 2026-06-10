@@ -20,6 +20,8 @@ export interface AgentRunContext {
   documentId: string | null
   agentRole: AgentRole
   userMessageText: string
+  /** Bounded oldest-first transcript of recent channel chat (absent when no channel/history). */
+  conversationText?: string | null
   emit: AgentEmitter
   signal: AbortSignal
 }

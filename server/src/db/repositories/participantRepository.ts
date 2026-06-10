@@ -5,7 +5,6 @@ import type { Queryable } from '../query.js'
 export interface ParticipantRow {
   id: string
   participant_type: ParticipantType
-  user_id: string | null
   agent_id: string | null
   display_name: string
   avatar_url: string | null
@@ -17,7 +16,6 @@ export interface ParticipantRow {
 const PARTICIPANT_SELECT = `
   p.id,
   p.participant_type,
-  p.user_id,
   p.agent_id,
   p.display_name,
   p.avatar_url,
@@ -46,38 +44,6 @@ export async function getParticipantById(id: string, client?: Queryable): Promis
     [id],
     client
   )
-}
-
-export async function getHumanParticipantByUserId(userId: string, client?: Queryable): Promise<ParticipantRow | null> {
-  return queryOne<ParticipantRow>(
-    `select ${PARTICIPANT_SELECT} from participants p
-     left join agents a on a.id = p.agent_id
-     where p.user_id = $1 and p.participant_type = 'human'`,
-    [userId],
-    client
-  )
-}
-
-/** Ensure a human participant exists for a user; returns its id. */
-export async function ensureHumanParticipant(
-  userId: string,
-  fallback: { displayName: string; avatarUrl: string | null; color: string },
-  client?: Queryable
-): Promise<string> {
-  const existing = await getHumanParticipantByUserId(userId, client)
-  if (existing) return existing.id
-
-  const inserted = await query<{ id: string }>(
-    `insert into participants (participant_type, user_id, display_name, avatar_url, color)
-     values ('human', $1, $2, $3, $4)
-     on conflict (user_id) where participant_type = 'human' do update set display_name = excluded.display_name
-     returning id`,
-    [userId, fallback.displayName, fallback.avatarUrl, fallback.color],
-    client
-  )
-  const id = inserted[0]?.id
-  if (!id) throw new Error('Failed to ensure human participant')
-  return id
 }
 
 export async function listWorkspaceParticipants(workspaceId: string, client?: Queryable): Promise<ParticipantProfile[]> {

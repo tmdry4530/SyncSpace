@@ -1,10 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { apiRequest, startTestServer, type TestServer } from './helpers/testServer.js'
-import type { AuthUser, Channel, ChatMessage, DocumentMeta, Workspace } from '../src/types/contracts.js'
+import { solveChallengePrompt } from '../src/auth/challenge.js'
+import type { AgentRegistrationResult, AuthAgentIdentity } from '../src/types/contracts.js'
 
 let db: EmbeddedDatabase
 let server: TestServer
+// The primary agent registered in the first test; reused by later tests so the
+// per-IP registration rate limiter (5/min) is not exhausted.
+let primary: AgentRegistrationResult
 
 beforeAll(async () => {
   db = await startEmbeddedDatabase()
@@ -16,86 +20,107 @@ afterAll(async () => {
   await db?.stop()
 })
 
-describe('app auth + REST surface', () => {
-  it('registers a user, sets a session cookie, and returns the current user', async () => {
-    const registered = await apiRequest<{ user: AuthUser }>(server, 'POST', '/api/auth/register', {
-      body: { email: 'ada@syncspace.dev', password: 'password123', displayName: 'Ada Lovelace' }
+interface ChallengeResponse {
+  challengeId: string
+  prompt: string
+  expiresAt: string
+}
+
+async function requestChallenge(): Promise<ChallengeResponse> {
+  const res = await apiRequest<ChallengeResponse>(server, 'POST', '/api/agents/register/challenge', {
+    useCookies: false
+  })
+  expect(res.status).toBe(200)
+  return res.body
+}
+
+describe('agent registration + auth surface', () => {
+  it('registers an agent with the correct challenge answer and returns a one-time secret', async () => {
+    const challenge = await requestChallenge()
+    const answer = solveChallengePrompt(challenge.prompt)
+
+    const registered = await apiRequest<AgentRegistrationResult>(server, 'POST', '/api/agents/register', {
+      body: { challengeId: challenge.challengeId, answer, displayName: 'Ada Agent', slug: 'ada-agent', role: 'planner' }
     })
     expect(registered.status).toBe(200)
-    expect(registered.body.user.email).toBe('ada@syncspace.dev')
+    expect(registered.body.credential.secret).toBeTruthy()
+    expect(registered.body.credential.agentId).toBeTruthy()
+    expect(registered.body.identity.slug).toBe('ada-agent')
+    expect(registered.body.workspace.ownerParticipantId).toBe(registered.body.identity.participantId)
+    primary = registered.body
 
-    const me = await apiRequest<{ user: AuthUser | null }>(server, 'GET', '/api/auth/me')
-    expect(me.body.user?.email).toBe('ada@syncspace.dev')
+    // The register response sets the session cookie -> /api/auth/me resolves the identity.
+    const me = await apiRequest<{ identity: AuthAgentIdentity | null }>(server, 'GET', '/api/auth/me')
+    expect(me.body.identity?.agentId).toBe(registered.body.credential.agentId)
   })
 
-  it('rejects duplicate registration and wrong credentials', async () => {
-    const dup = await apiRequest(server, 'POST', '/api/auth/register', {
-      body: { email: 'ada@syncspace.dev', password: 'password123' },
+  it('rejects a wrong challenge answer with 422 challenge_failed (반려)', async () => {
+    const challenge = await requestChallenge()
+    const rejected = await apiRequest<{ code: string }>(server, 'POST', '/api/agents/register', {
+      body: { challengeId: challenge.challengeId, answer: 'definitely-wrong', displayName: 'Nope' },
       useCookies: false
     })
-    expect(dup.status).toBe(409)
+    expect(rejected.status).toBe(422)
+    expect(rejected.body.code).toBe('challenge_failed')
+  })
 
-    const bad = await apiRequest(server, 'POST', '/api/auth/login', {
-      body: { email: 'ada@syncspace.dev', password: 'wrongpass' },
+  it('rejects a reused or already-consumed challenge with 400', async () => {
+    const challenge = await requestChallenge()
+    const answer = solveChallengePrompt(challenge.prompt)
+
+    const first = await apiRequest<AgentRegistrationResult>(server, 'POST', '/api/agents/register', {
+      body: { challengeId: challenge.challengeId, answer, displayName: 'First Use' },
+      useCookies: false
+    })
+    expect(first.status).toBe(200)
+
+    const reuse = await apiRequest<{ code: string }>(server, 'POST', '/api/agents/register', {
+      body: { challengeId: challenge.challengeId, answer, displayName: 'Reuse' },
+      useCookies: false
+    })
+    expect(reuse.status).toBe(400)
+    expect(reuse.body.code).toBe('challenge_expired')
+  })
+
+  it('agent-login with the secret sets a session cookie; bad credentials are 401', async () => {
+    const { agentId, secret } = primary.credential
+
+    const login = await apiRequest<{ identity: AuthAgentIdentity }>(server, 'POST', '/api/auth/agent-login', {
+      body: { agentId, secret }
+    })
+    expect(login.status).toBe(200)
+    expect(login.body.identity.agentId).toBe(agentId)
+
+    const me = await apiRequest<{ identity: AuthAgentIdentity | null }>(server, 'GET', '/api/auth/me')
+    expect(me.body.identity?.agentId).toBe(agentId)
+
+    const bad = await apiRequest<{ code: string }>(server, 'POST', '/api/auth/agent-login', {
+      body: { agentId, secret: 'not-the-secret' },
       useCookies: false
     })
     expect(bad.status).toBe(401)
   })
 
-  it('requires a session for protected routes', async () => {
+  it('requires authentication for protected routes', async () => {
     const anon = await apiRequest(server, 'GET', '/api/workspaces', { useCookies: false })
     expect(anon.status).toBe(401)
   })
 
-  it('creates a workspace (owner auto-membership) and lists it', async () => {
-    const created = await apiRequest<{ workspace: Workspace }>(server, 'POST', '/api/workspaces', {
-      body: { name: 'Demo Workspace' }
-    })
-    expect(created.status).toBe(200)
-    const workspaceId = created.body.workspace.id
+  it('authorizes protected routes via a Bearer secret', async () => {
+    const { secret } = primary.credential
+    const workspaceId = primary.identity.workspaceId
 
-    const list = await apiRequest<{ workspaces: Workspace[] }>(server, 'GET', '/api/workspaces')
+    const list = await apiRequest<{ workspaces: { id: string }[] }>(server, 'GET', '/api/workspaces', {
+      useCookies: false,
+      headers: { authorization: `Bearer ${secret}` }
+    })
+    expect(list.status).toBe(200)
     expect(list.body.workspaces.some((w) => w.id === workspaceId)).toBe(true)
-
-    const channel = await apiRequest<{ channel: Channel }>(server, 'POST', `/api/workspaces/${workspaceId}/channels`, {
-      body: { name: 'general' }
-    })
-    expect(channel.status).toBe(200)
-
-    const doc = await apiRequest<{ document: DocumentMeta }>(server, 'POST', `/api/workspaces/${workspaceId}/documents`, {
-      body: { title: 'Welcome' }
-    })
-    expect(doc.status).toBe(200)
-
-    const messages = await apiRequest<{ items: ChatMessage[]; nextCursor: string | null }>(
-      server,
-      'GET',
-      `/api/channels/${channel.body.channel.id}/messages`
-    )
-    expect(messages.status).toBe(200)
-    expect(Array.isArray(messages.body.items)).toBe(true)
   })
 
-  it('does not leak workspaces to non-members (404, not 403)', async () => {
-    // Create a workspace as Ada.
-    const created = await apiRequest<{ workspace: Workspace }>(server, 'POST', '/api/workspaces', {
-      body: { name: 'Private' }
-    })
-    const workspaceId = created.body.workspace.id
-
-    // Register a second user with a fresh cookie jar.
-    const outsider = await startTestServer(db)
-    await apiRequest(outsider, 'POST', '/api/auth/register', {
-      body: { email: 'grace@syncspace.dev', password: 'password123' }
-    })
-    const channels = await apiRequest(outsider, 'GET', `/api/workspaces/${workspaceId}/channels`)
-    expect(channels.status).toBe(404)
-    await outsider.stop()
-  })
-
-  it('logs out and clears the session', async () => {
+  it('logs out and clears the session cookie', async () => {
     await apiRequest(server, 'POST', '/api/auth/logout')
-    const me = await apiRequest<{ user: AuthUser | null }>(server, 'GET', '/api/auth/me')
-    expect(me.body.user).toBeNull()
+    const me = await apiRequest<{ identity: AuthAgentIdentity | null }>(server, 'GET', '/api/auth/me')
+    expect(me.body.identity).toBeNull()
   })
 })

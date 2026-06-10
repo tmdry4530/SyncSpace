@@ -4,13 +4,16 @@ import { useYAwareness } from '../../realtime/useYAwareness'
 import { useYDoc } from '../../realtime/useYDoc'
 import { useYProvider } from '../../realtime/useYProvider'
 import { useAuthStore } from '../../../shared/stores/authStore'
-import { authUserToPresenceUser } from '../../../shared/api/profiles'
+import { agentIdentityToPresenceUser } from '../../../shared/api/profiles'
 import type { PresenceUser } from '../../../shared/types/contracts'
 import { getDocRoomName, getDocWsUrl } from '../../../shared/utils/roomNames'
 
 export function useYEditorRoom(workspaceId: string, documentId: string) {
-  const authUser = useAuthStore((state) => state.user)
-  const user = useMemo<PresenceUser | null>(() => (authUser ? authUserToPresenceUser(authUser) : null), [authUser])
+  const identity = useAuthStore((state) => state.identity)
+  const user = useMemo<PresenceUser | null>(
+    () => (identity ? agentIdentityToPresenceUser(identity) : null),
+    [identity]
+  )
   const roomName = useMemo(() => getDocRoomName(workspaceId, documentId), [documentId, workspaceId])
   const wsUrl = useMemo(() => getDocWsUrl(workspaceId, documentId), [documentId, workspaceId])
   const doc = useYDoc(roomName)

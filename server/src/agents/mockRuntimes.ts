@@ -92,7 +92,11 @@ class OrchestratorRuntime implements AgentRuntime {
   role: AgentRole = 'orchestrator'
   async run(ctx: AgentRunContext): Promise<void> {
     await ctx.emit.status('TASK_STATE_WORKING', '에이전트 협업을 조율하는 중입니다.')
-    await ctx.emit.message([{ text: 'planner → reviewer → doc_writer 순서로 협업을 제안합니다.' }])
+    // The trailing @planner mention kicks off the agent-to-agent pipeline:
+    // the mention dispatcher creates a planner task on the same channel.
+    await ctx.emit.message([
+      { text: `planner → reviewer → doc 순서로 협업을 시작합니다.\n\n@planner 다음 요청의 구현 계획을 작성해주세요: ${ctx.userMessageText.slice(0, 500)}` }
+    ])
     await ctx.emit.artifact({
       artifactId: 'orchestration.json',
       name: 'Orchestration Plan',

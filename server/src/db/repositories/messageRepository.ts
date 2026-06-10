@@ -10,7 +10,6 @@ export interface PersistMessageInput {
   createdAt?: string
   authorParticipantId: string
   authorType: ParticipantType
-  userId?: string | null
   agentId?: string | null
   a2aMessageId?: string | null
   metadata?: Record<string, unknown>
@@ -25,7 +24,6 @@ export interface ListMessagesInput {
 interface MessageRow {
   id: string
   channel_id: string
-  user_id: string | null
   content: string
   client_id: string | null
   created_at: string
@@ -41,7 +39,6 @@ interface MessageRow {
 const MESSAGE_SELECT = `
   m.id,
   m.channel_id,
-  m.user_id,
   m.content,
   m.client_id,
   m.created_at,
@@ -66,7 +63,7 @@ function toChatMessage(row: MessageRow): ChatMessage {
   return {
     id: row.id,
     channelId: row.channel_id,
-    userId: row.user_id ?? row.author_participant_id ?? '',
+    userId: row.author_participant_id ?? row.id,
     content: row.content,
     createdAt: row.created_at,
     ...(row.client_id ? { clientId: row.client_id } : {}),
@@ -83,10 +80,10 @@ function clampLimit(limit: number): number {
 export async function persistMessage(input: PersistMessageInput, client?: Queryable): Promise<ChatMessage> {
   const insert = await query<MessageRow>(
     `with inserted as (
-       insert into messages (id, channel_id, user_id, content, client_id, created_at,
+       insert into messages (id, channel_id, content, client_id, created_at,
                              author_participant_id, author_type, agent_id, a2a_message_id, metadata)
-       values (coalesce($1, gen_random_uuid()), $2, $3, $4, $5, coalesce($6::timestamptz, now()),
-               $7, $8, $9, $10, coalesce($11::jsonb, '{}'::jsonb))
+       values (coalesce($1, gen_random_uuid()), $2, $3, $4, coalesce($5::timestamptz, now()),
+               $6, $7, $8, $9, coalesce($10::jsonb, '{}'::jsonb))
        on conflict (channel_id, client_id) where client_id is not null do nothing
        returning *
      )
@@ -96,7 +93,6 @@ export async function persistMessage(input: PersistMessageInput, client?: Querya
     [
       input.id ?? null,
       input.channelId,
-      input.userId ?? null,
       input.content,
       input.clientId ?? null,
       input.createdAt ?? null,
@@ -125,6 +121,76 @@ export async function persistMessage(input: PersistMessageInput, client?: Querya
   }
 
   throw new Error('Failed to persist chat message')
+}
+
+/** Provenance class of a transcript line, derived server-side (never client-claimed alone). */
+export type TranscriptAuthorKind = 'human' | 'internal_agent' | 'remote_agent'
+
+export interface TranscriptMessage {
+  id: string
+  content: string
+  displayName: string | null
+  authorKind: TranscriptAuthorKind
+}
+
+interface TranscriptRow {
+  id: string
+  content: string
+  author_type: ParticipantType
+  agent_id: string | null
+  author_display_name: string | null
+  author_agent_id: string | null
+  author_remote_agent_id: string | null
+}
+
+function toTranscriptAuthorKind(row: TranscriptRow): TranscriptAuthorKind {
+  if (row.author_type === 'human') return 'human'
+  if (row.author_remote_agent_id) return 'remote_agent'
+  if (row.author_agent_id ?? row.agent_id) return 'internal_agent'
+  // Agent-claimed but not attributable to an internal agent: least-trusted agent class.
+  return 'remote_agent'
+}
+
+/**
+ * Newest-first recent channel messages with author provenance, for LLM
+ * transcript building. Provenance comes from the participant row (what the
+ * author IS), not from message-level claims, except the human/agent split
+ * which lives on the message itself.
+ */
+export async function listTranscriptMessages(
+  channelId: string,
+  limit: number,
+  workspaceId?: string | null,
+  client?: Queryable
+): Promise<TranscriptMessage[]> {
+  // Defense-in-depth: when a workspaceId is given, only read the channel if it
+  // actually belongs to that workspace, so a mis-bound task can never leak another
+  // workspace's chat into an LLM prompt or an outbound remote send.
+  const params: unknown[] = [channelId, clampLimit(limit)]
+  let workspaceClause = ''
+  if (workspaceId) {
+    params.push(workspaceId)
+    workspaceClause = `and exists (select 1 from channels c where c.id = m.channel_id and c.workspace_id = $3)`
+  }
+  const rows = await query<TranscriptRow>(
+    `select m.id, m.content, m.author_type, m.agent_id,
+            p.display_name as author_display_name,
+            p.agent_id as author_agent_id,
+            p.remote_agent_id as author_remote_agent_id
+     from messages m
+     left join participants p on p.id = m.author_participant_id
+     where m.channel_id = $1 ${workspaceClause}
+     order by m.created_at desc, m.id desc
+     limit $2`,
+    params,
+    client
+  )
+  return rows.map((row) => ({
+    id: row.id,
+    content: row.content,
+    displayName: row.author_display_name,
+    authorKind: toTranscriptAuthorKind(row)
+  }))
 }
 
 export async function listMessages(input: ListMessagesInput, client?: Queryable): Promise<PaginatedChatMessages> {

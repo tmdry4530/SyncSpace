@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { verifyDatabase } from '../src/db/verify.js'
+import { loadMigrationFiles } from '../src/db/migrate.js'
 
 let db: EmbeddedDatabase
+const expectedMigrationCount = loadMigrationFiles().length
 
 beforeAll(async () => {
   db = await startEmbeddedDatabase()
@@ -14,8 +16,6 @@ afterAll(async () => {
 
 const EXPECTED_TABLES = [
   'schema_migrations',
-  'app_users',
-  'auth_sessions',
   'workspaces',
   'workspace_members',
   'channels',
@@ -24,6 +24,7 @@ const EXPECTED_TABLES = [
   'participants',
   'agents',
   'agent_tokens',
+  'agent_registration_challenges',
   'a2a_contexts',
   'a2a_tasks',
   'a2a_messages',
@@ -31,9 +32,15 @@ const EXPECTED_TABLES = [
   'a2a_task_events',
   'yjs_document_snapshots',
   'a2a_push_notification_configs',
+  'remote_agents',
+  'remote_agent_tokens',
+  'remote_a2a_event_dedup',
   'jobs',
   'audit_logs'
 ]
+
+// Human auth tables were dropped in 0013_agent_credentials (agent-only model).
+const DROPPED_TABLES = ['app_users', 'auth_sessions']
 
 const EXPECTED_ENUMS = [
   'participant_type',
@@ -43,6 +50,8 @@ const EXPECTED_ENUMS = [
   'a2a_task_state',
   'a2a_message_role',
   'a2a_event_type',
+  'remote_verification_status',
+  'remote_health_status',
   'job_status'
 ]
 
@@ -54,6 +63,9 @@ describe('full schema migrations', () => {
     const present = new Set(rows.rows.map((row) => row.table_name))
     for (const table of EXPECTED_TABLES) {
       expect(present.has(table), `missing table: ${table}`).toBe(true)
+    }
+    for (const table of DROPPED_TABLES) {
+      expect(present.has(table), `table should be dropped: ${table}`).toBe(false)
     }
   })
 
@@ -83,10 +95,17 @@ describe('full schema migrations', () => {
     expect(rows.rows[0]?.is_identity).toBe('YES')
   })
 
-  it('enforces the participants exactly-one-owner constraint', async () => {
+  it('enforces the participants agent-only constraint (no human participants)', async () => {
+    // Human participants were removed in 0013; the agent-only check rejects them.
     await expect(
       db.pool.query(
         `insert into participants (participant_type, display_name) values ('human', 'invalid')`
+      )
+    ).rejects.toThrow()
+    // An agent participant with no agent_id is also rejected.
+    await expect(
+      db.pool.query(
+        `insert into participants (participant_type, display_name) values ('agent', 'no-agent')`
       )
     ).rejects.toThrow()
   })
@@ -116,6 +135,6 @@ describe('full schema migrations', () => {
     expect(report.pending).toEqual([])
     expect(report.issues).toEqual([])
     expect(report.ok).toBe(true)
-    expect(report.appliedCount).toBe(12)
+    expect(report.appliedCount).toBe(expectedMigrationCount)
   })
 })

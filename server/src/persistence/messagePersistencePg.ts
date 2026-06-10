@@ -1,21 +1,15 @@
 import type { ChatMessage, PaginatedChatMessages } from '../types/contracts.js'
 import type { ListMessagesInput, MessagePersistenceAdapter, MessagePersistInput } from './messagePersistence.js'
 import { listMessages as repoListMessages, persistMessage as repoPersistMessage } from '../db/repositories/messageRepository.js'
-import { getHumanParticipantByUserId } from '../db/repositories/participantRepository.js'
 
 class PostgresMessagePersistenceAdapter implements MessagePersistenceAdapter {
   async persistMessage(input: MessagePersistInput): Promise<ChatMessage> {
-    const authorType = input.authorType ?? 'human'
-    let authorParticipantId = input.authorParticipantId ?? null
-
-    // Backwards compatible: resolve the human participant from a legacy userId.
-    if (!authorParticipantId && input.userId) {
-      const participant = await getHumanParticipantByUserId(input.userId)
-      authorParticipantId = participant?.id ?? null
-    }
+    // Authorship is always a participant (agents only — no human accounts).
+    const authorParticipantId = input.authorParticipantId ?? null
     if (!authorParticipantId) {
-      throw new Error('Cannot persist message: author participant could not be resolved')
+      throw new Error('Cannot persist message: authorParticipantId is required')
     }
+    const authorType = input.authorType ?? 'agent'
 
     return repoPersistMessage({
       ...(input.id ? { id: input.id } : {}),
@@ -25,7 +19,6 @@ class PostgresMessagePersistenceAdapter implements MessagePersistenceAdapter {
       ...(input.createdAt ? { createdAt: input.createdAt } : {}),
       authorParticipantId,
       authorType,
-      userId: authorType === 'human' ? input.userId ?? null : null,
       agentId: input.agentId ?? null,
       a2aMessageId: input.a2aMessageId ?? null,
       ...(input.metadata ? { metadata: input.metadata } : {})

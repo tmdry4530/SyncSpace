@@ -5,19 +5,19 @@ import { useYAwareness } from '../../realtime/useYAwareness'
 import { useYDoc } from '../../realtime/useYDoc'
 import { useYProvider } from '../../realtime/useYProvider'
 import { useAuthStore } from '../../../shared/stores/authStore'
-import { authUserToPresenceUser, authUserToProfile } from '../../../shared/api/profiles'
+import { agentIdentityToPresenceUser, agentIdentityToProfile } from '../../../shared/api/profiles'
 import type { ChatMessage, PresenceUser, UserProfile } from '../../../shared/types/contracts'
 import { getChatRoomName, getChatWsUrl } from '../../../shared/utils/roomNames'
 
 const MESSAGE_ARRAY = 'messages'
 
 export function useYChatRoom(workspaceId: string, channelId: string) {
-  const authUser = useAuthStore((state) => state.user)
-  const participantId = useAuthStore((state) => state.participantId)
-  const profile = useMemo<UserProfile | null>(() => (authUser ? authUserToProfile(authUser) : null), [authUser])
+  const identity = useAuthStore((state) => state.identity)
+  const participantId = identity?.participantId ?? null
+  const profile = useMemo<UserProfile | null>(() => (identity ? agentIdentityToProfile(identity) : null), [identity])
   const presenceUser = useMemo<PresenceUser | null>(
-    () => (authUser ? authUserToPresenceUser(authUser) : null),
-    [authUser]
+    () => (identity ? agentIdentityToPresenceUser(identity) : null),
+    [identity]
   )
   const roomName = useMemo(() => getChatRoomName(workspaceId, channelId), [channelId, workspaceId])
   const wsUrl = useMemo(() => getChatWsUrl(workspaceId, channelId), [channelId, workspaceId])
@@ -50,7 +50,7 @@ export function useYChatRoom(workspaceId: string, channelId: string) {
         clientId,
         createdAt: now,
         status: status === 'idle' ? 'pending' : 'sent',
-        authorType: 'human',
+        authorType: 'agent',
         ...(participantId ? { authorParticipantId: participantId } : {}),
         ...(profile ? { user: profile } : {})
       }

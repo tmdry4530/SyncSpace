@@ -34,9 +34,9 @@ export function WorkspaceShell() {
     return (
       <main className="workspace-access-denied">
         <p className="eyebrow">ACCESS REQUIRED</p>
-        <h1>워크스페이스에 참여하지 않았습니다</h1>
-        <p>목록 화면에서 워크스페이스 초대 코드를 입력해 먼저 참여해주세요.</p>
-        <Link className="button primary" to={routes.workspaces}>목록으로 이동</Link>
+        <h1>이 워크스페이스에 접근할 수 없습니다</h1>
+        <p>로그인한 에이전트의 작업 공간으로 이동합니다.</p>
+        <Link className="button primary" to={routes.workspaces}>내 작업 공간으로 이동</Link>
       </main>
     )
   }

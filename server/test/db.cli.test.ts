@@ -3,10 +3,12 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
+import { loadMigrationFiles } from '../src/db/migrate.js'
 
 const run = promisify(execFile)
 const serverDir = fileURLToPath(new URL('..', import.meta.url))
 const tsxBin = fileURLToPath(new URL('../node_modules/.bin/tsx', import.meta.url))
+const expectedMigrationCount = loadMigrationFiles().length
 
 let db: EmbeddedDatabase
 
@@ -28,10 +30,10 @@ describe('db CLI entry points', () => {
     const { stdout } = await run(tsxBin, ['src/db/migrate.ts'], { cwd: serverDir, env: cliEnv() })
     const result = JSON.parse(stdout.trim().split('\n').pop() ?? '{}')
     expect(result.ok).toBe(true)
-    expect(result.applied.length).toBe(12)
+    expect(result.applied.length).toBe(expectedMigrationCount)
 
     const rows = await db.pool.query<{ count: string }>(`select count(*)::text as count from schema_migrations`)
-    expect(Number(rows.rows[0]?.count)).toBe(12)
+    expect(Number(rows.rows[0]?.count)).toBe(expectedMigrationCount)
   }, 60_000)
 
   it('pnpm db:verify reports a clean database', async () => {
@@ -39,7 +41,7 @@ describe('db CLI entry points', () => {
     const report = JSON.parse(stdout.trim())
     expect(report.ok).toBe(true)
     expect(report.pending).toEqual([])
-    expect(report.appliedCount).toBe(12)
+    expect(report.appliedCount).toBe(expectedMigrationCount)
   }, 60_000)
 
   it('re-running db:migrate is idempotent', async () => {

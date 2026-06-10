@@ -5,11 +5,19 @@ import { closePool } from '../db/pool.js'
 import { startJobRunner, type JobRunnerHandle, type QueueSpec } from './jobRunner.js'
 import { processAgentTaskJob } from './agentTaskWorker.js'
 import { processPushJob } from './pushNotificationWorker.js'
+import { processRemotePollJob, processRemoteSendJob } from './remoteAgentWorker.js'
 
 export function buildWorkerQueues(): QueueSpec[] {
   const queues: QueueSpec[] = []
   if (process.env.AGENT_WORKER_ENABLED !== 'false') {
     queues.push({ name: 'agent', handlers: { agent_task: (payload, deps) => processAgentTaskJob(payload, deps) } })
+    queues.push({
+      name: 'remote',
+      handlers: {
+        remote_a2a_send: (payload, deps) => processRemoteSendJob(payload, deps),
+        remote_a2a_poll: (payload, deps) => processRemotePollJob(payload, deps)
+      }
+    })
   }
   if (process.env.PUSH_WORKER_ENABLED !== 'false') {
     queues.push({ name: 'push', handlers: { push_delivery: (payload, deps) => processPushJob(payload, deps) } })

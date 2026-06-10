@@ -1,7 +1,7 @@
 export interface ClientEnv {
   apiUrl: string
   wsUrl: string
-  wsAuthMode: 'off' | 'session'
+  wsAuthMode: 'off' | 'agent'
 }
 
 export function readClientEnv(): ClientEnv {
@@ -22,6 +22,6 @@ function httpUrlFromWsUrl(wsUrl: string): string {
 
 function readWsAuthMode(): ClientEnv['wsAuthMode'] {
   const configured = import.meta.env.VITE_WS_AUTH_MODE?.trim().toLowerCase()
-  if (configured === 'off' || configured === 'session') return configured
-  return 'session'
+  if (configured === 'off' || configured === 'agent') return configured
+  return 'agent'
 }

@@ -57,7 +57,8 @@ export interface A2aTaskRow {
   workspace_id: string
   channel_id: string | null
   document_id: string | null
-  agent_id: string
+  agent_id: string | null
+  remote_agent_id: string | null
   title: string | null
   status_state: A2aTaskState
   status_message: Record<string, unknown> | null
@@ -77,7 +78,8 @@ export async function createTask(
     workspaceId: string
     channelId?: string | null
     documentId?: string | null
-    agentId: string
+    agentId?: string | null
+    remoteAgentId?: string | null
     title?: string | null
     createdByParticipantId?: string | null
     acceptedOutputModes?: string[]
@@ -87,16 +89,17 @@ export async function createTask(
 ): Promise<A2aTaskRow> {
   const rows = await query<A2aTaskRow>(
     `insert into a2a_tasks
-       (context_id, workspace_id, channel_id, document_id, agent_id, title,
+       (context_id, workspace_id, channel_id, document_id, agent_id, remote_agent_id, title,
         accepted_output_modes, metadata, created_by_participant_id)
-     values ($1, $2, $3, $4, $5, $6, coalesce($7::text[], array['text/plain']), coalesce($8::jsonb, '{}'::jsonb), $9)
+     values ($1, $2, $3, $4, $5, $6, $7, coalesce($8::text[], array['text/plain']), coalesce($9::jsonb, '{}'::jsonb), $10)
      returning *`,
     [
       input.contextId,
       input.workspaceId,
       input.channelId ?? null,
       input.documentId ?? null,
-      input.agentId,
+      input.agentId ?? null,
+      input.remoteAgentId ?? null,
       input.title ?? null,
       input.acceptedOutputModes ?? null,
       input.metadata ? JSON.stringify(input.metadata) : null,
@@ -111,6 +114,11 @@ export async function createTask(
 
 export async function getTask(id: string, client?: Queryable): Promise<A2aTaskRow | null> {
   return queryOne<A2aTaskRow>(`select * from a2a_tasks where id = $1`, [id], client)
+}
+
+/** Record the remote side's task id on a local task that proxies a remote agent. */
+export async function setTaskExternalId(taskId: string, externalTaskId: string, client?: Queryable): Promise<void> {
+  await query(`update a2a_tasks set external_task_id = $2, updated_at = now() where id = $1`, [taskId, externalTaskId], client)
 }
 
 const TERMINAL_SQL_STATES = [

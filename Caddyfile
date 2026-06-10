@@ -2,7 +2,7 @@
 #
 # 역할 / role:
 #   - 정적 빌드(/usr/share/caddy)를 SPA로 서빙 (try_files → /index.html).
-#   - 백엔드 경로(/api, /a2a, /.well-known/agent-card.json, /chat, /doc,
+#   - 백엔드 경로(/api, /a2a, /.well-known/agent-card.json, /skill.md, /skill.json, /chat, /doc,
 #     /health, /ready)는 api 서비스(API_INTERNAL_URL)로 reverse_proxy.
 #   - WebSocket(/chat/*, /doc/*) 업그레이드는 Caddy reverse_proxy가 기본 지원.
 #
@@ -22,7 +22,7 @@
 	# --- 백엔드로 프록시되는 경로들 (REST / A2A / realtime / health) ---
 	# 정적 핸들러보다 먼저 매칭되도록 명시한다.
 	@backend {
-		path /api/* /a2a/* /.well-known/agent-card.json /chat/* /doc/* /health /ready
+		path /api/* /a2a/* /.well-known/agent-card.json /skill.md /skill.json /chat/* /doc/* /health /ready
 	}
 	# Caddy reverse_proxy는 Connection: Upgrade 헤더를 자동 처리하므로
 	# /chat/*, /doc/* WebSocket 업그레이드가 그대로 통과한다.

@@ -2,9 +2,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { startTestServer, type TestServer } from './helpers/testServer.js'
-import { createUserWithParticipant } from '../src/db/repositories/userRepository.js'
-import { createWorkspace } from '../src/db/repositories/workspaceRepository.js'
-import { createAgent, createAgentToken } from '../src/db/repositories/agentRepository.js'
+import { registerAgentFixture } from './helpers/agentFixture.js'
+import { createAgentToken } from '../src/db/repositories/agentRepository.js'
 import { startJobRunner } from '../src/workers/jobRunner.js'
 import { processAgentTaskJob } from '../src/workers/agentTaskWorker.js'
 import { processPushJob } from '../src/workers/pushNotificationWorker.js'
@@ -74,10 +73,10 @@ async function newTaskId(messageId: string): Promise<string> {
 beforeAll(async () => {
   db = await startEmbeddedDatabase()
   server = await startTestServer(db)
-  const { user } = await createUserWithParticipant({ email: 'push@syncspace.dev', displayName: 'Push', passwordHash: null })
-  const workspace = await createWorkspace({ name: 'Push WS', ownerId: user.id })
-  const agent = await createAgent({ workspaceId: workspace.id, slug: 'planner', displayName: 'Planner', role: 'planner' })
-  token = (await createAgentToken({ agentId: agent.id, scopes: ['task:read', 'task:write', 'push:write'], pepper: PEPPER })).token
+  const reg = await registerAgentFixture({ displayName: 'Push', slug: 'push-owner' })
+  token = (
+    await createAgentToken({ agentId: reg.credential.agentId, scopes: ['task:read', 'task:write', 'push:write'], pepper: PEPPER })
+  ).token
 }, 90_000)
 
 afterAll(async () => {

@@ -335,6 +335,31 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .auth-hint code { color: var(--primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .stack { display: grid; gap: 1rem; margin-top: 1.5rem; }
 .stack label { display: grid; gap: 0.45rem; color: var(--muted-strong); font-weight: 650; }
+.stack textarea, .stack select {
+  width: 100%;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: var(--surface-low);
+  border-radius: var(--radius);
+  padding: 0.72rem 0.82rem;
+  font: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.stack textarea { resize: vertical; min-height: 64px; }
+.stack select { min-height: 40px; }
+.stack textarea:focus, .stack select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); background: #fff; }
+.prompt-box { font-weight: 600; line-height: 1.5; }
+.secret-box {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  background: var(--surface);
+  border-color: var(--primary);
+}
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-top: 1.5rem; padding: 0.3rem; background: var(--surface-low); border: 1px solid var(--line); border-radius: var(--radius); }
+.auth-tab { background: transparent; border: none; color: var(--muted-strong); font-weight: 650; padding: 0.55rem 0.5rem; border-radius: calc(var(--radius) - 4px); box-shadow: none; }
+.auth-tab:hover { transform: none; box-shadow: none; background: rgba(15, 23, 42, 0.04); }
+.auth-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08); }
 
 /* Workspace list */
 .workspace-index {
@@ -2770,6 +2795,61 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .agent-status-badge.tone-success { color: #047857; background: #ecfdf5; }
 .agent-status-badge.tone-danger { color: #b91c1c; background: #fef2f2; }
 .agent-status-badge.tone-neutral { color: #64748b; background: #f1f5f9; }
+
+/* Remote (external) agent directory: registration, verify token reveal, roster rows. */
+.remote-directory { display: grid; gap: 0.7rem; }
+.remote-register { display: grid; gap: 0.6rem; }
+.remote-register-form { display: grid; gap: 0.35rem; }
+.remote-register-label { font-size: 0.72rem; font-weight: 700; color: var(--muted-strong); }
+.remote-register-row { display: flex; gap: 0.4rem; }
+.remote-register-row input { flex: 1; min-width: 0; }
+.remote-register-row .button { flex-shrink: 0; }
+
+.remote-verify-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.remote-verify-card .eyebrow { margin: 0; }
+.remote-verify-copy { margin: 0; font-size: 0.76rem; line-height: 1.5; color: var(--muted-strong); }
+.remote-verify-field { display: flex; align-items: center; gap: 0.4rem; }
+.remote-verify-field-label { flex-shrink: 0; font-size: 0.66rem; font-weight: 700; color: var(--muted); width: 4.5rem; }
+.remote-verify-value {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.72rem;
+}
+.remote-verify-token { font-weight: 700; color: var(--primary); }
+.remote-verify-actions { display: flex; gap: 0.4rem; }
+
+.remote-agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.remote-agent-item {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-low);
+}
+.remote-agent-head { display: flex; align-items: center; gap: 0.55rem; }
+.remote-agent-desc { margin: 0; font-size: 0.73rem; line-height: 1.45; color: var(--muted); }
+.remote-agent-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.remote-agent-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.remote-agent-actions .button.small { min-height: 28px; padding: 0.3rem 0.5rem; font-size: 0.72rem; }
+.remote-agent-delete { margin-left: auto; color: var(--danger); }
+.remote-agent-invoke { display: flex; gap: 0.4rem; }
+.remote-agent-invoke input { flex: 1; min-width: 0; }
+.remote-agent-invoke .button { flex-shrink: 0; }
 
 .agent-task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
 .agent-task-item {

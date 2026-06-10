@@ -1,16 +1,26 @@
+import { readConfig, type ServerConfig } from '../config.js'
 import type { AgentRole } from '../types/contracts.js'
 import { getMockRuntime } from './mockRuntimes.js'
-import type { AgentRuntime, AgentRuntimeMode } from './runtime.js'
-
-export function resolveRuntimeMode(): AgentRuntimeMode {
-  return process.env.AGENT_RUNTIME_MODE === 'live' ? 'live' : 'mock'
-}
+import { createLiveRuntime } from './liveRuntime.js'
+import { getModelProvider } from './providers/index.js'
+import type { AgentRuntime } from './runtime.js'
 
 /**
- * Resolve the runtime for an agent role. `live` mode would dispatch to a
- * model-provider adapter; until that exists it falls back to the deterministic
- * mock runtime (AGENT_RUNTIME_MODE=mock is the safe default).
+ * Resolve the runtime for an agent role from config.
+ *
+ * - `AGENT_RUNTIME_MODE=mock` (default) → deterministic mock runtime.
+ * - `AGENT_RUNTIME_MODE=live` → ModelProvider-backed runtime.
+ *
+ * Live mode never silently falls back to mock: a missing/invalid provider config
+ * already fails at boot (`config.ts` → assertAgentRuntimeConfig), so a live build
+ * that can't reach its provider is a hard failure, not hidden degradation.
  */
-export function getAgentRuntime(role: AgentRole, _mode: AgentRuntimeMode = 'mock'): AgentRuntime {
+export function getAgentRuntime(role: AgentRole, config: ServerConfig = readConfig()): AgentRuntime {
+  if (config.agentRuntimeMode === 'live') {
+    return createLiveRuntime(role, getModelProvider(config), {
+      maxTokens: config.agentLiveMaxTokens,
+      timeoutMs: config.agentLiveTimeoutMs
+    })
+  }
   return getMockRuntime(role)
 }

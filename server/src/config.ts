@@ -2,8 +2,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { LogLevel } from './utils/logger.js'
 
-export type RealtimeAuthMode = 'off' | 'supabase' | 'session'
+export type RealtimeAuthMode = 'off' | 'agent'
 export type DocPersistenceMode = 'file' | 'postgres'
+export type AgentRuntimeMode = 'mock' | 'live'
 
 export interface ServerConfig {
   nodeEnv: string
@@ -25,6 +26,12 @@ export interface ServerConfig {
   a2aAgentCardUrl: string | null
   docPersistenceMode: DocPersistenceMode
   trustProxy: boolean
+  agentRuntimeMode: AgentRuntimeMode
+  modelProvider: string
+  anthropicApiKey: string | null
+  anthropicModel: string
+  agentLiveMaxTokens: number
+  agentLiveTimeoutMs: number
 }
 
 const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000']
@@ -52,9 +59,15 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const docPersistenceMode = parseDocPersistenceMode(env.SYNCSPACE_DOC_PERSISTENCE_MODE, databaseUrl)
   // Trust X-Forwarded-For only behind a known proxy (Railway/Caddy terminate it).
   const trustProxy = env.TRUST_PROXY ? env.TRUST_PROXY.trim().toLowerCase() === 'true' : nodeEnv === 'production'
+  const agentRuntimeMode = parseAgentRuntimeMode(env.AGENT_RUNTIME_MODE)
+  const modelProvider = (nonEmpty(env.MODEL_PROVIDER) ?? 'anthropic').toLowerCase()
+  const anthropicApiKey = readFirstEnv(env, ['ANTHROPIC_API_KEY'])
+  const anthropicModel = nonEmpty(env.ANTHROPIC_MODEL) ?? 'claude-sonnet-4-6'
+  const agentLiveMaxTokens = parsePositiveInt(env.AGENT_LIVE_MAX_TOKENS, 4096)
+  const agentLiveTimeoutMs = parsePositiveInt(env.AGENT_LIVE_TIMEOUT_MS, 60_000)
 
-  assertSupabaseAuthConfig(wsAuthMode, { supabaseUrl, supabaseServiceRoleKey })
-  assertSessionAuthConfig(wsAuthMode, nodeEnv, { databaseUrl, authSecret })
+  assertAgentAuthConfig(wsAuthMode, { databaseUrl, agentTokenPepper })
+  assertAgentRuntimeConfig(agentRuntimeMode, modelProvider, anthropicApiKey)
 
   return {
     nodeEnv,
@@ -75,7 +88,40 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     a2aInterfaceUrl,
     a2aAgentCardUrl,
     docPersistenceMode,
-    trustProxy
+    trustProxy,
+    agentRuntimeMode,
+    modelProvider,
+    anthropicApiKey,
+    anthropicModel,
+    agentLiveMaxTokens,
+    agentLiveTimeoutMs
+  }
+}
+
+function parseAgentRuntimeMode(value: string | undefined): AgentRuntimeMode {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === 'live') return 'live'
+  // Mock is the safe operational default; opt into live explicitly.
+  return 'mock'
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) return fallback
+  const parsed = Number.parseInt(value, 10)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+/**
+ * In live mode the configured model provider must be usable. We fail fast at boot
+ * rather than silently falling back to mock, which would hide an outage.
+ */
+function assertAgentRuntimeConfig(mode: AgentRuntimeMode, provider: string, anthropicApiKey: string | null): void {
+  if (mode !== 'live') return
+  if (provider === 'anthropic' && !anthropicApiKey) {
+    throw new Error('AGENT_RUNTIME_MODE=live with MODEL_PROVIDER=anthropic requires ANTHROPIC_API_KEY.')
+  }
+  if (provider !== 'anthropic') {
+    throw new Error(`AGENT_RUNTIME_MODE=live: unsupported MODEL_PROVIDER "${provider}" (only "anthropic" is implemented).`)
   }
 }
 
@@ -86,19 +132,18 @@ function parseDocPersistenceMode(value: string | undefined, databaseUrl: string 
   return databaseUrl ? 'postgres' : 'file'
 }
 
-function assertSessionAuthConfig(
+function assertAgentAuthConfig(
   wsAuthMode: RealtimeAuthMode,
-  nodeEnv: string,
-  config: { databaseUrl: string | null; authSecret: string | null }
+  config: { databaseUrl: string | null; agentTokenPepper: string | null }
 ): void {
-  if (wsAuthMode !== 'session') return
+  if (wsAuthMode !== 'agent') return
   const missing = [
     config.databaseUrl ? null : 'DATABASE_URL',
-    config.authSecret ? null : 'AUTH_SECRET'
+    config.agentTokenPepper ? null : 'AGENT_TOKEN_PEPPER'
   ].filter(Boolean)
   if (missing.length > 0) {
     throw new Error(
-      `WS_AUTH_MODE=session is enabled, but the backend process is missing: ${missing.join(', ')}.`
+      `WS_AUTH_MODE=agent is enabled, but the backend process is missing: ${missing.join(', ')}.`
     )
   }
 }
@@ -114,25 +159,6 @@ function readFirstEnv(env: NodeJS.ProcessEnv, keys: string[]): string | null {
     if (value) return value
   }
   return null
-}
-
-function assertSupabaseAuthConfig(
-  wsAuthMode: RealtimeAuthMode,
-  config: Pick<ServerConfig, 'supabaseUrl' | 'supabaseServiceRoleKey'>
-): void {
-  if (wsAuthMode !== 'supabase') return
-
-  const missing = [
-    config.supabaseUrl ? null : 'SUPABASE_URL',
-    config.supabaseServiceRoleKey ? null : 'SUPABASE_SERVICE_ROLE_KEY'
-  ].filter(Boolean)
-
-  if (missing.length > 0) {
-    throw new Error(
-      `WS_AUTH_MODE=supabase is enabled, but the backend process is missing: ${missing.join(', ')}. ` +
-        'Set these on the Railway backend service Variables, not only on Vercel or another service.'
-    )
-  }
 }
 
 function parsePort(value: string | undefined, fallback: number): number {
@@ -155,9 +181,11 @@ function parseList(value: string | undefined, fallback: string[]): string[] {
 
 function parseAuthMode(value: string | undefined, nodeEnv: string): RealtimeAuthMode {
   const normalized = value?.trim().toLowerCase()
-  // App-owned session auth is the production default now that Supabase is removed.
-  if (!normalized) return nodeEnv === 'production' ? 'session' : 'off'
-  if (normalized === 'off' || normalized === 'supabase' || normalized === 'session') return normalized
+  // Agent-credential auth is the production default.
+  if (!normalized) return nodeEnv === 'production' ? 'agent' : 'off'
+  if (normalized === 'off') return 'off'
+  // Accept legacy 'session'/'supabase' values as the agent-credential mode.
+  if (normalized === 'agent' || normalized === 'session' || normalized === 'supabase') return 'agent'
   throw new Error(`Invalid WS_AUTH_MODE value: ${value}`)
 }
 

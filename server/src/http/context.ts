@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { AgentTokenContext, SessionContext } from '../auth/context.js'
+import type { AuthContext } from '../auth/context.js'
 import { badRequest } from './errors.js'
 
 const MAX_BODY_BYTES = 1024 * 1024 // 1 MiB
@@ -14,10 +14,8 @@ export interface RequestContext {
   params: Record<string, string>
   cookies: Record<string, string>
   ip: string | null
-  /** Populated by requireSession middleware. */
-  session: SessionContext | null
-  /** Populated by requireAgentToken middleware. */
-  agentToken: AgentTokenContext | null
+  /** Populated by requireAuth middleware (the resolved agent credential). */
+  auth: AuthContext | null
   rawBody(): Promise<Buffer>
   json<T = unknown>(): Promise<T>
   header(name: string): string | null
@@ -46,8 +44,7 @@ export function createRequestContext(
     params: {},
     cookies: parseCookies(req.headers.cookie),
     ip: readClientIp(req, options.trustProxy ?? false),
-    session: null,
-    agentToken: null,
+    auth: null,
     rawBody,
     json: async <T = unknown>(): Promise<T> => {
       const buffer = await rawBody()

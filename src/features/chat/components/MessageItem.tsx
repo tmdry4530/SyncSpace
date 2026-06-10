@@ -3,8 +3,9 @@ import { useAuthStore } from '../../../shared/stores/authStore'
 import { formatDisplayName } from '../../../shared/utils/displayName'
 
 export function MessageItem({ message }: { message: ChatMessage }) {
-  const user = useAuthStore((state) => state.user)
-  const isMe = user?.id === message.userId
+  const identity = useAuthStore((state) => state.identity)
+  const isMe =
+    identity?.participantId === (message.authorParticipantId ?? message.userId)
   const label = formatDisplayName(message.user?.displayName, `사용자 ${message.userId.slice(0, 4)}`)
   const color = message.user?.color ?? '#8b5cf6'
 

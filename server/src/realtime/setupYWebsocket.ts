@@ -4,7 +4,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type * as Y from 'yjs'
 import { docs, setPersistence, setupWSConnection } from '@y/websocket-server/utils'
 import { isOriginAllowed, type ServerConfig } from '../config.js'
-import type { RealtimeAuthorizer } from '../auth/realtimeAuth.js'
+import type { RealtimeAuthorizer, RealtimeConnectionIdentity } from '../auth/realtimeAuth.js'
 import type { MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import type { Logger } from '../utils/logger.js'
 import { createChatRoomPersistenceHooks } from './chatRoom.js'
@@ -31,7 +31,10 @@ export interface RealtimeServerHandle {
   close(): Promise<void>
 }
 
-type RequestWithRoute = IncomingMessage & { syncSpaceRoute?: RealtimeRoute }
+type RequestWithRoute = IncomingMessage & {
+  syncSpaceRoute?: RealtimeRoute
+  syncSpaceIdentity?: RealtimeConnectionIdentity
+}
 
 type YDocWithConnections = Y.Doc & { conns?: Map<unknown, unknown> }
 
@@ -42,7 +45,11 @@ export function setupYWebsocketServer(options: SetupYWebsocketOptions): Realtime
     perMessageDeflate: false,
     handleProtocols: (protocols) => (protocols.has('bearer') ? 'bearer' : false)
   })
-  const chatPersistence = createChatRoomPersistenceHooks(messagePersistence, logger)
+  const chatPersistence = createChatRoomPersistenceHooks(messagePersistence, logger, {
+    // With realtime auth off (dev mode) there is no upgrade identity to
+    // attribute messages to, so authorship enforcement must be disabled.
+    enforceAuthorship: config.wsAuthMode !== 'off'
+  })
   const docPersistence = createDocRoomPersistenceHooks(logger, { backend: createDocStorageBackend(config, logger) })
 
   setPersistence({
@@ -71,6 +78,12 @@ export function setupYWebsocketServer(options: SetupYWebsocketOptions): Realtime
     socket.on('error', (error) => {
       logger.warn('WebSocket connection error', { roomName: route.roomName, error: error.message })
     })
+
+    // Bind the authenticated upgrade identity to this socket BEFORE Yjs sync
+    // starts: updates from this connection carry the socket as transaction
+    // origin, which is how persisted chat messages get their authorship.
+    const identity = (request as RequestWithRoute).syncSpaceIdentity
+    if (identity) chatPersistence.registerConnection(socket, identity)
 
     try {
       setupWSConnection(socket, request, { docName: route.roomName })
@@ -103,6 +116,7 @@ export function setupYWebsocketServer(options: SetupYWebsocketOptions): Realtime
     }
 
     ;(request as RequestWithRoute).syncSpaceRoute = route
+    if (auth.identity) (request as RequestWithRoute).syncSpaceIdentity = auth.identity
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request)
     })

@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { startEmbeddedDatabase, type EmbeddedDatabase } from './helpers/embeddedPostgres.js'
 import { startTestServer, type TestServer } from './helpers/testServer.js'
-import { createUserWithParticipant } from '../src/db/repositories/userRepository.js'
-import { createWorkspace } from '../src/db/repositories/workspaceRepository.js'
-import { createAgent, createAgentToken } from '../src/db/repositories/agentRepository.js'
+import { registerAgentFixture } from './helpers/agentFixture.js'
+import { createAgentToken } from '../src/db/repositories/agentRepository.js'
 
 let db: EmbeddedDatabase
 let server: TestServer
@@ -40,15 +39,19 @@ beforeAll(async () => {
   db = await startEmbeddedDatabase()
   server = await startTestServer(db)
 
-  const { user } = await createUserWithParticipant({ email: 'owner@syncspace.dev', displayName: 'Owner', passwordHash: null })
-  const workspace = await createWorkspace({ name: 'A2A HTTP', ownerId: user.id })
-  const agent = await createAgent({ workspaceId: workspace.id, slug: 'planner', displayName: 'Planner', role: 'planner' })
-  token = (await createAgentToken({ agentId: agent.id, scopes: ['task:read', 'task:write', 'task:cancel', 'push:write'], pepper: PEPPER })).token
+  const mine = await registerAgentFixture({ displayName: 'Owner', slug: 'http-owner' })
+  token = (
+    await createAgentToken({
+      agentId: mine.credential.agentId,
+      scopes: ['task:read', 'task:write', 'task:cancel', 'push:write'],
+      pepper: PEPPER
+    })
+  ).token
 
-  const { user: other } = await createUserWithParticipant({ email: 'other@syncspace.dev', displayName: 'Other', passwordHash: null })
-  const otherWs = await createWorkspace({ name: 'Other WS', ownerId: other.id })
-  const otherAgent = await createAgent({ workspaceId: otherWs.id, slug: 'planner', displayName: 'Planner', role: 'planner' })
-  otherToken = (await createAgentToken({ agentId: otherAgent.id, scopes: ['task:read', 'task:write'], pepper: PEPPER })).token
+  const other = await registerAgentFixture({ displayName: 'Other', slug: 'http-other' })
+  otherToken = (
+    await createAgentToken({ agentId: other.credential.agentId, scopes: ['task:read', 'task:write'], pepper: PEPPER })
+  ).token
 }, 90_000)
 
 afterAll(async () => {

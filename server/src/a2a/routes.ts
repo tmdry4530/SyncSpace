@@ -21,6 +21,10 @@ import {
 import { getTask, listTasks, type A2aTaskRow } from '../db/repositories/a2aRepository.js'
 import { listEvents } from '../db/repositories/a2aRepository.js'
 import { getAgentBySlug, ensureDefaultAgents } from '../db/repositories/agentRepository.js'
+import { getRemoteAgentById } from '../db/repositories/remoteAgentRepository.js'
+import { remoteGetTask } from './client.js'
+import { bridgeRemoteTaskIntoLocal, buildRemoteTarget } from './remoteBridge.js'
+import { verifyRemoteCallbackToken } from './remoteCallback.js'
 import { createPushConfig, deletePushConfig, getPushConfig, listPushConfigs } from '../db/repositories/a2aPushRepository.js'
 import { writeAuditLog } from '../db/repositories/auditRepository.js'
 import { assertSafeWebhookUrl } from './push.js'
@@ -45,6 +49,8 @@ const AGENT_CARD_PATH = '/.well-known/agent-card.json'
 // 60 task-creating calls/min per IP; max 5 concurrent SSE streams per IP.
 const sendLimiter = new RateLimiter(60_000, 60)
 const streamLimiter = new ConcurrencyLimiter(5)
+// Inbound remote-agent push callbacks: per-task token-authenticated, generous cap.
+const callbackLimiter = new RateLimiter(60_000, 240)
 
 export function isA2aPath(pathname: string): boolean {
   return pathname === AGENT_CARD_PATH || pathname === '/a2a' || pathname.startsWith('/a2a/')
@@ -79,6 +85,11 @@ async function dispatch(ctx: RequestContext, deps: A2aHandlerDeps): Promise<Http
     if (method !== 'GET') throw methodNotAllowed()
     await requirePrincipal(ctx, deps.config)
     return json(buildExtendedAgentCard(deps.config))
+  }
+
+  if (rest[0] === 'remote-callback') {
+    if (method !== 'POST') throw methodNotAllowed()
+    return handleRemoteCallback(ctx, deps, decodeURIComponent(rest[1] ?? ''))
   }
 
   if (rest[0] === 'message:send') {
@@ -200,6 +211,47 @@ async function prepareSend(ctx: RequestContext, deps: A2aHandlerDeps): Promise<P
 async function handleMessageSend(ctx: RequestContext, deps: A2aHandlerDeps): Promise<HttpResponse> {
   const { task } = await prepareSend(ctx, deps)
   return json({ task })
+}
+
+// ---------- remote-agent push callback (inbound) ----------
+
+/**
+ * Inbound notification from a remote agent that one of our proxy tasks changed.
+ * Authenticated by the per-task callback token (HMAC of the task id). The body is
+ * NOT trusted for state — we re-fetch the authoritative task from the remote and
+ * bridge it (idempotent), so a forged/replayed callback can at worst trigger a
+ * harmless reconcile of the task it is scoped to. Always 200s to keep the remote's
+ * delivery loop simple; the poll fallback covers any missed callback.
+ */
+async function handleRemoteCallback(ctx: RequestContext, deps: A2aHandlerDeps, taskId: string): Promise<HttpResponse> {
+  if (!taskId) throw notFound('A2A route not found.')
+  if (!callbackLimiter.check(ctx.ip ?? 'unknown')) throw tooManyRequests('콜백 요청이 너무 많습니다.')
+
+  const raw = await ctx.json().catch(() => null)
+  const body = (raw && typeof raw === 'object' ? raw : {}) as { token?: unknown }
+  const presented = typeof body.token === 'string' ? body.token : ctx.header('x-a2a-callback-token')
+  if (!verifyRemoteCallbackToken(taskId, presented, deps.config)) {
+    throw new HttpError(401, 'invalid_callback_token', 'Invalid or missing callback token.')
+  }
+
+  const task = await getTask(taskId)
+  // Ack unknown/non-remote/terminal tasks without disclosing which case it was.
+  if (!task || !task.remote_agent_id || isTerminalState(task.status_state) || !task.external_task_id) {
+    return json({ ok: true })
+  }
+  const remote = await getRemoteAgentById(task.remote_agent_id)
+  if (!remote) return json({ ok: true })
+
+  try {
+    const remoteTask = await remoteGetTask(buildRemoteTarget(remote), task.external_task_id)
+    await bridgeRemoteTaskIntoLocal(task, remote.id, remoteTask, { logger: deps.logger })
+  } catch (error) {
+    deps.logger.warn('Remote callback reconcile failed', {
+      taskId,
+      error: error instanceof Error ? error.message : String(error)
+    })
+  }
+  return json({ ok: true })
 }
 
 // ---------- message:stream ----------

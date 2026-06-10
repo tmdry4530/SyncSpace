@@ -14,6 +14,8 @@ import { registerHealthRoutes } from './routes/healthRoutes.js'
 import { registerAuthRoutes } from './routes/authRoutes.js'
 import { registerWorkspaceRoutes } from './routes/workspaceRoutes.js'
 import { registerAgentRoutes } from './routes/agentRoutes.js'
+import { registerRemoteAgentRoutes } from './routes/remoteAgentRoutes.js'
+import { registerPublicSkillRoutes } from './routes/publicSkillRoutes.js'
 import { A2aStreamingHub } from '../a2a/streaming.js'
 import { createA2aHandler } from '../a2a/routes.js'
 import { getQueueStats } from '../db/repositories/jobRepository.js'
@@ -61,6 +63,8 @@ export function createSyncSpaceServer(options: SyncSpaceServerOptions = {}): Syn
   registerAuthRoutes(router, config)
   registerWorkspaceRoutes(router, config)
   registerAgentRoutes(router, config)
+  registerRemoteAgentRoutes(router, config)
+  registerPublicSkillRoutes(router, config)
 
   const server = createServer((request, response) => {
     void dispatch(request, response, router, config, logger, rawHandlers)

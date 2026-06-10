@@ -27,7 +27,6 @@
     "test:realtime": "pnpm --filter server exec vitest run realtime"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "^5.100.7",
     "@tiptap/extension-collaboration": "^3.22.5",
     "@tiptap/extension-placeholder": "^3.22.5",

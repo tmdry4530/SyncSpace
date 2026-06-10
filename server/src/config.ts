@@ -13,8 +13,6 @@ export interface ServerConfig {
   port: number
   allowedOrigins: string[]
   wsAuthMode: RealtimeAuthMode
-  supabaseUrl: string | null
-  supabaseServiceRoleKey: string | null
   logLevel: LogLevel
   databaseUrl: string | null
   authSecret: string | null
@@ -46,8 +44,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const port = parsePort(env.PORT, 1234)
   const publicAppUrl = readFirstEnv(env, ['PUBLIC_APP_URL'])
   const allowedOrigins = includePublicAppOrigin(parseList(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS), publicAppUrl)
-  const supabaseUrl = readFirstEnv(env, ['SUPABASE_URL', 'VITE_SUPABASE_URL'])
-  const supabaseServiceRoleKey = readFirstEnv(env, ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY', 'SERVICE_ROLE_KEY'])
   const wsAuthMode = parseAuthMode(env.WS_AUTH_MODE, nodeEnv)
   const logLevel = parseLogLevel(env.LOG_LEVEL)
   const databaseUrl = readFirstEnv(env, ['DATABASE_URL', 'POSTGRES_URL'])
@@ -78,8 +74,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     port,
     allowedOrigins,
     wsAuthMode,
-    supabaseUrl,
-    supabaseServiceRoleKey,
     logLevel,
     databaseUrl,
     authSecret,
@@ -229,10 +223,6 @@ export function isRequestOriginAllowed(request: IncomingMessage, config: ServerC
   const requestOrigins = requestOriginCandidates(request, config.trustProxy)
   const normalizedOrigin = normalizeOrigin(origin)
   return requestOrigins.some((candidate) => normalizeOrigin(candidate) === normalizedOrigin)
-}
-
-export function hasSupabaseAdminConfig(config: ServerConfig): boolean {
-  return Boolean(config.supabaseUrl && config.supabaseServiceRoleKey)
 }
 
 export function hasDatabaseConfig(config: ServerConfig): boolean {

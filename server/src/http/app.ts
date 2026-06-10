@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { isOriginAllowed, readConfig, type ServerConfig } from '../config.js'
+import { isRequestOriginAllowed, readConfig, type ServerConfig } from '../config.js'
 import { createRealtimeAuthorizer, type RealtimeAuthorizer } from '../auth/realtimeAuth.js'
 import { createMessagePersistenceAdapter, type MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import { setupYWebsocketServer, type RealtimeServerHandle } from '../realtime/setupYWebsocket.js'
@@ -123,7 +123,7 @@ async function dispatch(
   const cors = corsHeaders(request)
 
   try {
-    if (request.headers.origin && !isOriginAllowed(request.headers.origin, config.allowedOrigins)) {
+    if (!isRequestOriginAllowed(request, config)) {
       sendResponse(response, json({ code: 'forbidden_origin', message: 'Origin is not allowed' }, 403), cors)
       return
     }

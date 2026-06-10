@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import type { IncomingMessage } from 'node:http'
 import type { LogLevel } from './utils/logger.js'
 
 export type RealtimeAuthMode = 'off' | 'agent'
@@ -43,7 +44,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const nodeEnv = env.NODE_ENV?.trim() || 'development'
   const host = env.HOST?.trim() || '0.0.0.0'
   const port = parsePort(env.PORT, 1234)
-  const allowedOrigins = parseList(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS)
+  const publicAppUrl = readFirstEnv(env, ['PUBLIC_APP_URL'])
+  const allowedOrigins = includePublicAppOrigin(parseList(env.ALLOWED_ORIGINS, DEFAULT_ALLOWED_ORIGINS), publicAppUrl)
   const supabaseUrl = readFirstEnv(env, ['SUPABASE_URL', 'VITE_SUPABASE_URL'])
   const supabaseServiceRoleKey = readFirstEnv(env, ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SERVICE_KEY', 'SERVICE_ROLE_KEY'])
   const wsAuthMode = parseAuthMode(env.WS_AUTH_MODE, nodeEnv)
@@ -53,7 +55,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const sessionCookieName = nonEmpty(env.SESSION_COOKIE_NAME) ?? 'syncspace_session'
   const sessionCookieDomain = readFirstEnv(env, ['SESSION_COOKIE_DOMAIN'])
   const agentTokenPepper = readFirstEnv(env, ['AGENT_TOKEN_PEPPER'])
-  const publicAppUrl = readFirstEnv(env, ['PUBLIC_APP_URL'])
   const a2aVersion = nonEmpty(env.A2A_VERSION) ?? '1.0'
   const a2aInterfaceUrl = (nonEmpty(env.A2A_INTERFACE_URL) ?? `${publicAppUrl ?? 'http://localhost:1234'}/a2a`).replace(/\/$/, '')
   const a2aAgentCardUrl = readFirstEnv(env, ['A2A_AGENT_CARD_URL'])
@@ -216,7 +217,18 @@ function parseLogLevel(value: string | undefined): LogLevel {
 export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) return true
   if (allowedOrigins.includes('*')) return true
-  return allowedOrigins.includes(origin)
+  const normalizedOrigin = normalizeOrigin(origin)
+  return allowedOrigins.some((allowed) => allowed === origin || normalizeOrigin(allowed) === normalizedOrigin)
+}
+
+export function isRequestOriginAllowed(request: IncomingMessage, config: ServerConfig): boolean {
+  const origin = firstHeader(request.headers.origin)
+  if (!origin) return true
+  if (isOriginAllowed(origin, config.allowedOrigins)) return true
+
+  const requestOrigins = requestOriginCandidates(request, config.trustProxy)
+  const normalizedOrigin = normalizeOrigin(origin)
+  return requestOrigins.some((candidate) => normalizeOrigin(candidate) === normalizedOrigin)
 }
 
 export function hasSupabaseAdminConfig(config: ServerConfig): boolean {
@@ -243,6 +255,39 @@ function loadLocalEnvFiles(): void {
       process.env[key] = unquoteEnvValue(rawValue)
     }
   }
+}
+
+function includePublicAppOrigin(allowedOrigins: string[], publicAppUrl: string | null): string[] {
+  const publicOrigin = normalizeOrigin(publicAppUrl)
+  if (!publicOrigin || allowedOrigins.includes('*')) return allowedOrigins
+  if (allowedOrigins.some((origin) => normalizeOrigin(origin) === publicOrigin)) return allowedOrigins
+  return [...allowedOrigins, publicOrigin]
+}
+
+function normalizeOrigin(value: string | null | undefined): string | null {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function requestOriginCandidates(request: IncomingMessage, trustProxy: boolean): string[] {
+  const hosts = [
+    trustProxy ? firstHeader(request.headers['x-forwarded-host']) : null,
+    firstHeader(request.headers.host)
+  ].filter(Boolean) as string[]
+  if (hosts.length === 0) return []
+
+  const forwardedProto = trustProxy ? firstHeader(request.headers['x-forwarded-proto'])?.split(',')[0]?.trim() : null
+  const protocols = forwardedProto ? [forwardedProto] : ['http', 'https']
+  return hosts.flatMap((host) => protocols.map((protocol) => `${protocol}://${host}`))
+}
+
+function firstHeader(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
 }
 
 function unquoteEnvValue(value: string): string {

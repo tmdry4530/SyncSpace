@@ -3,7 +3,7 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import type * as Y from 'yjs'
 import { docs, setPersistence, setupWSConnection } from '@y/websocket-server/utils'
-import { isOriginAllowed, type ServerConfig } from '../config.js'
+import { isRequestOriginAllowed, type ServerConfig } from '../config.js'
 import type { RealtimeAuthorizer, RealtimeConnectionIdentity } from '../auth/realtimeAuth.js'
 import type { MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
 import type { Logger } from '../utils/logger.js'
@@ -104,7 +104,7 @@ export function setupYWebsocketServer(options: SetupYWebsocketOptions): Realtime
       return
     }
 
-    if (!isOriginAllowed(request.headers.origin, config.allowedOrigins)) {
+    if (!isRequestOriginAllowed(request, config)) {
       rejectUpgrade(socket, 403, 'Forbidden')
       return
     }

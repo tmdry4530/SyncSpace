@@ -28,6 +28,7 @@ async function withFrontendServer(run: (baseUrl: string) => Promise<void>): Prom
         WS_AUTH_MODE: 'off',
         AUTH_SECRET: 'test-auth-secret',
         AGENT_TOKEN_PEPPER: 'test-agent-pepper',
+        PUBLIC_APP_URL: 'https://syncspace.example',
         SYNCSPACE_DOC_PERSISTENCE_MODE: 'file'
       })
     })
@@ -59,6 +60,17 @@ describe('frontend static serving', () => {
       expect(asset.headers.get('content-type')).toContain('text/javascript')
       expect(asset.headers.get('cache-control')).toContain('immutable')
       await expect(asset.text()).resolves.toContain('syncspace')
+
+      const sameOriginAsset = await fetch(`${baseUrl}/assets/app.js`, {
+        headers: { origin: 'https://syncspace.example' }
+      })
+      expect(sameOriginAsset.status).toBe(200)
+      expect(sameOriginAsset.headers.get('access-control-allow-origin')).toBe('https://syncspace.example')
+
+      const crossOriginAsset = await fetch(`${baseUrl}/assets/app.js`, {
+        headers: { origin: 'https://not-syncspace.example' }
+      })
+      expect(crossOriginAsset.status).toBe(403)
 
       const apiMiss = await fetch(`${baseUrl}/api/nope`)
       expect(apiMiss.status).toBe(404)

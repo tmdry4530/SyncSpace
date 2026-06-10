@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "pnpm --filter server build"
+    "buildCommand": "pnpm build"
   },
   "deploy": {
     "preDeployCommand": "sh -c 'if [ -n \"${DATABASE_URL}${POSTGRES_URL}\" ]; then node server/dist/db/migrate.js; else echo \"DATABASE_URL not configured; skipping migrations\"; fi'",

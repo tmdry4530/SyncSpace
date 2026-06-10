@@ -5,13 +5,20 @@ export interface ClientEnv {
 }
 
 export function readClientEnv(): ClientEnv {
-  const wsUrl = import.meta.env.VITE_WS_URL?.replace(/\/$/, '') || 'ws://localhost:1234'
+  const wsUrl = import.meta.env.VITE_WS_URL?.replace(/\/$/, '') || wsUrlFromCurrentOrigin() || 'ws://localhost:1234'
 
   return {
     apiUrl: import.meta.env.VITE_API_URL?.replace(/\/$/, '') || httpUrlFromWsUrl(wsUrl),
     wsUrl,
     wsAuthMode: readWsAuthMode()
   }
+}
+
+function wsUrlFromCurrentOrigin(): string | null {
+  if (typeof window === 'undefined') return null
+  if (window.location.protocol === 'https:') return `wss://${window.location.host}`
+  if (window.location.protocol === 'http:') return `ws://${window.location.host}`
+  return null
 }
 
 function httpUrlFromWsUrl(wsUrl: string): string {

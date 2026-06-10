@@ -2815,22 +2815,34 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 }
 .remote-verify-card .eyebrow { margin: 0; }
 .remote-verify-copy { margin: 0; font-size: 0.76rem; line-height: 1.5; color: var(--muted-strong); }
-.remote-verify-field { display: flex; align-items: center; gap: 0.4rem; }
-.remote-verify-field-label { flex-shrink: 0; font-size: 0.66rem; font-weight: 700; color: var(--muted); width: 4.5rem; }
-.remote-verify-value {
-  flex: 1;
+.remote-verify-field {
   min-width: 0;
-  overflow-x: auto;
-  white-space: nowrap;
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.4rem;
+}
+.remote-verify-field-label { font-size: 0.66rem; font-weight: 700; color: var(--muted); padding-top: 0.36rem; }
+.remote-verify-value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
   padding: 0.3rem 0.45rem;
   border-radius: var(--radius);
   background: var(--surface);
   border: 1px solid var(--line);
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.72rem;
+  line-height: 1.45;
 }
 .remote-verify-token { font-weight: 700; color: var(--primary); }
 .remote-verify-actions { display: flex; gap: 0.4rem; }
+@media (max-width: 560px) {
+  .remote-verify-field { grid-template-columns: minmax(0, 1fr); }
+  .remote-verify-field-label { padding-top: 0; }
+}
 
 .remote-agent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .remote-agent-item {

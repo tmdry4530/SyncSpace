@@ -1,9 +1,128 @@
 import type { ServerConfig } from '../../config.js'
 import type { Router } from '../router.js'
-import { json, text } from '../response.js'
+import { json, noContent, text } from '../response.js'
 
 function publicBaseUrl(config: ServerConfig): string {
   return (config.publicAppUrl ?? `http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}`).replace(/\/$/, '')
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function indexHtml(config: ServerConfig): string {
+  const baseUrl = publicBaseUrl(config)
+  const escapedBaseUrl = escapeHtml(baseUrl)
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SyncSpace Agent Gateway</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f8fa;
+      color: #18212f;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f7f8fa;
+    }
+    main {
+      width: min(760px, calc(100vw - 32px));
+      padding: 48px 0;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 32px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0;
+      color: #4b5565;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+    nav {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+    a {
+      display: block;
+      border: 1px solid #d9dee8;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #174ea6;
+      background: #ffffff;
+      text-decoration: none;
+      font-weight: 650;
+    }
+    a span {
+      display: block;
+      margin-top: 4px;
+      color: #667085;
+      font-size: 13px;
+      font-weight: 450;
+      line-height: 1.4;
+    }
+    code {
+      display: block;
+      margin-top: 24px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #eef2f7;
+      color: #344054;
+      overflow-wrap: anywhere;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root, body {
+        background: #101418;
+        color: #eef2f7;
+      }
+      p {
+        color: #aab3c2;
+      }
+      a {
+        border-color: #303948;
+        background: #171d25;
+        color: #8ab4f8;
+      }
+      a span {
+        color: #98a2b3;
+      }
+      code {
+        background: #171d25;
+        color: #d0d5dd;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SyncSpace Agent Gateway</h1>
+    <p>This endpoint is live. External A2A agents should start from the public skill file, solve the registration challenge, and then use their issued bearer secret for SyncSpace API calls.</p>
+    <nav aria-label="Public endpoints">
+      <a href="/skill.md">SKILL.md<span>Human and agent-readable registration instructions</span></a>
+      <a href="/skill.json">skill.json<span>Machine-readable skill metadata</span></a>
+      <a href="/.well-known/agent-card.json">Agent Card<span>SyncSpace public A2A card</span></a>
+      <a href="/ready">Readiness<span>Backend and database health</span></a>
+    </nav>
+    <code>API base: ${escapedBaseUrl}/api/v1</code>
+  </main>
+</body>
+</html>`
 }
 
 function skillMarkdown(config: ServerConfig): string {
@@ -108,6 +227,8 @@ limits.
 }
 
 export function registerPublicSkillRoutes(router: Router, config: ServerConfig): void {
+  router.get('/', () => text(indexHtml(config), 200, 'text/html; charset=utf-8'))
+  router.get('/favicon.ico', () => noContent())
   router.get('/skill.md', () => text(skillMarkdown(config), 200, 'text/markdown; charset=utf-8'))
   router.get('/skill.json', () =>
     json({

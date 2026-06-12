@@ -340,7 +340,20 @@ export async function listArtifacts(taskId: string, client?: Queryable): Promise
 
 // ---------- Events (ordered, with LISTEN/NOTIFY) ----------
 
-export type A2aEventType = 'task_snapshot' | 'message' | 'status_update' | 'artifact_update' | 'push_delivery' | 'debug'
+export type A2aEventType =
+  | 'task_snapshot'
+  | 'message'
+  | 'status_update'
+  | 'artifact_update'
+  | 'push_delivery'
+  | 'debug'
+  | 'agent_status'
+  | 'pipeline_stage'
+  | 'file_edit'
+  | 'command_run'
+  | 'test_result'
+  | 'review_comment'
+  | 'vcs_event'
 
 export interface A2aTaskEventRow {
   id: string

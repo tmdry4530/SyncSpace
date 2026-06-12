@@ -3,6 +3,8 @@
  * surface SyncSpace exposes; DB rows are mapped to/from these in mapper.ts.
  */
 
+import type { EngineeringEvent } from './engineeringEvents.js'
+
 export type A2aTaskState =
   | 'TASK_STATE_UNSPECIFIED'
   | 'TASK_STATE_SUBMITTED'
@@ -93,6 +95,7 @@ export type StreamResponse =
   | { message: A2aMessage }
   | { statusUpdate: TaskStatusUpdateEvent }
   | { artifactUpdate: TaskArtifactUpdateEvent }
+  | { engineeringEvent: EngineeringEvent }
 
 export interface ListTasksResponse {
   tasks: Task[]

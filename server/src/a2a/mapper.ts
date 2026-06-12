@@ -15,6 +15,8 @@ import type {
   TaskStatus,
   TaskStatusUpdateEvent
 } from './types.js'
+import { isEngineeringEventType } from './engineeringEvents.js'
+import type { EngineeringEvent } from './engineeringEvents.js'
 
 export function mapMessageRowToA2aMessage(row: A2aMessageRow): A2aMessage {
   return {
@@ -88,6 +90,9 @@ export function mapEventRowToStreamResponse(row: A2aTaskEventRow): StreamRespons
     case 'artifact_update':
       return { artifactUpdate: row.payload as unknown as TaskArtifactUpdateEvent }
     default:
+      if (isEngineeringEventType(row.event_type)) {
+        return { engineeringEvent: row.payload as unknown as EngineeringEvent }
+      }
       return null
   }
 }

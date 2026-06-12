@@ -95,6 +95,9 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
           authorParticipantId: agent.participant_id,
           authorInternalAgentId: agent.id,
           hops,
+          // Pass the current task's context so all collaboration tasks in the
+          // same chain share one a2a context (= one mission in the Mission View).
+          originContextId: task.context_id,
           logger: deps.logger
         })
       }

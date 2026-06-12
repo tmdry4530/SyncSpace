@@ -18,6 +18,7 @@ export interface SeedDemoMissionInput {
 
 export interface SeedDemoMissionResult {
   taskId: string
+  contextId: string
 }
 
 /** ISO timestamp helper — adds `offsetMs` to a fixed base so events are ordered. */
@@ -423,5 +424,5 @@ export async function seedDemoMission(input: SeedDemoMissionInput): Promise<Seed
   await appendEvent({ taskId, contextId, eventType: 'vcs_event', payload: step12b as Record<string, unknown>, visibleToUser: true })
   await appendEvent({ taskId, contextId, eventType: 'agent_status', payload: step12c as Record<string, unknown>, visibleToUser: true })
 
-  return { taskId }
+  return { taskId, contextId }
 }

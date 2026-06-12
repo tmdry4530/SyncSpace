@@ -41,9 +41,9 @@ export async function seed(logger: (message: string) => void = (m) => console.lo
   const agentId = orchestrator?.id ?? result.credential.agentId
 
   try {
-    const { taskId } = await seedDemoMission({ workspaceId, agentId, createdByParticipantId })
+    const { contextId } = await seedDemoMission({ workspaceId, agentId, createdByParticipantId })
     logger('DEMO mission seeded — open the Mission View at:')
-    logger(`http://localhost:5173/w/${workspaceId}/mission/${taskId}`)
+    logger(`http://localhost:5173/w/${workspaceId}/mission/${contextId}`)
   } catch (err) {
     logger(`WARNING: demo mission seed failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`)
   }

@@ -123,5 +123,6 @@ export function streamResponseEventName(response: StreamResponse): string {
   if ('task' in response) return 'message'
   if ('message' in response) return 'message'
   if ('statusUpdate' in response) return 'statusUpdate'
+  if ('engineeringEvent' in response) return 'engineeringEvent'
   return 'artifactUpdate'
 }

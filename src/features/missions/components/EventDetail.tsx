@@ -1,126 +1,30 @@
 import type { EngineeringTaskEvent } from '../hooks/useMissionQuery'
 import type { EngineeringEvent } from '../../../shared/types/engineeringEvents'
-
-function FieldList({ fields }: { fields: Array<{ label: string; value: string | number | undefined | null }> }) {
-  const visible = fields.filter((f) => f.value != null && f.value !== '')
-  if (visible.length === 0) return <p className="mission-empty-note">필드 없음</p>
-  return (
-    <dl className="event-detail-fields">
-      {visible.map(({ label, value }) => (
-        <div key={label} className="event-detail-field">
-          <dt>{label}</dt>
-          <dd>{String(value)}</dd>
-        </div>
-      ))}
-    </dl>
-  )
-}
+import { DiffRenderer } from './renderers/DiffRenderer'
+import { CommandRenderer } from './renderers/CommandRenderer'
+import { TestResultRenderer } from './renderers/TestResultRenderer'
+import { ReviewCommentRenderer } from './renderers/ReviewCommentRenderer'
+import { VcsEventRenderer } from './renderers/VcsEventRenderer'
+import { AgentStatusRenderer } from './renderers/AgentStatusRenderer'
+import { PipelineStageRenderer } from './renderers/PipelineStageRenderer'
 
 function renderEventBody(eng: EngineeringEvent) {
   switch (eng.kind) {
     case 'agent_status':
-      return (
-        <FieldList
-          fields={[
-            { label: 'Agent ID', value: eng.agentId },
-            { label: 'Role', value: eng.role },
-            { label: 'Status', value: eng.status },
-            { label: 'Current Action', value: eng.currentAction },
-            { label: 'Path', value: eng.path }
-          ]}
-        />
-      )
+      return <AgentStatusRenderer event={eng} />
     case 'pipeline_stage':
-      return (
-        <FieldList
-          fields={[
-            { label: 'Stage', value: eng.stage },
-            { label: 'Status', value: eng.status },
-            { label: 'Summary', value: eng.summary },
-            { label: 'Started', value: eng.startedAt },
-            { label: 'Ended', value: eng.endedAt }
-          ]}
-        />
-      )
+      return <PipelineStageRenderer event={eng} />
     case 'file_edit':
-      return (
-        <>
-          <FieldList
-            fields={[
-              { label: 'Path', value: eng.path },
-              { label: 'Summary', value: eng.summary },
-              { label: 'Additions', value: eng.additions },
-              { label: 'Deletions', value: eng.deletions }
-            ]}
-          />
-          <pre className="event-detail-raw">{eng.unifiedDiff}</pre>
-        </>
-      )
+      return <DiffRenderer event={eng} />
     case 'command_run':
-      return (
-        <>
-          <FieldList
-            fields={[
-              { label: 'Command', value: eng.command },
-              { label: 'CWD', value: eng.cwd },
-              { label: 'Status', value: eng.status },
-              { label: 'Exit Code', value: eng.exitCode }
-            ]}
-          />
-          {eng.stdoutTail ? <pre className="event-detail-raw">{eng.stdoutTail}</pre> : null}
-          {eng.stderrTail ? <pre className="event-detail-raw event-detail-raw--err">{eng.stderrTail}</pre> : null}
-        </>
-      )
+      return <CommandRenderer event={eng} />
     case 'test_result':
-      return (
-        <>
-          <FieldList
-            fields={[
-              { label: 'Suite', value: eng.suite },
-              { label: 'Status', value: eng.status },
-              { label: 'Passed', value: eng.passed },
-              { label: 'Failed', value: eng.failed },
-              { label: 'Duration (ms)', value: eng.durationMs }
-            ]}
-          />
-          {eng.failures && eng.failures.length > 0 ? (
-            <ul className="event-detail-failures">
-              {eng.failures.map((f, i) => (
-                <li key={i}>
-                  <strong>{f.name}</strong>
-                  {f.message ? <p>{f.message}</p> : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </>
-      )
+      return <TestResultRenderer event={eng} />
     case 'review_comment':
-      return (
-        <FieldList
-          fields={[
-            { label: 'Path', value: eng.path },
-            { label: 'Lines', value: eng.lineStart != null ? `${eng.lineStart}–${eng.lineEnd ?? eng.lineStart}` : undefined },
-            { label: 'Severity', value: eng.severity },
-            { label: 'Verdict', value: eng.verdict },
-            { label: 'Comment', value: eng.comment }
-          ]}
-        />
-      )
+      return <ReviewCommentRenderer event={eng} />
     case 'vcs_event':
-      return (
-        <FieldList
-          fields={[
-            { label: 'Action', value: eng.action },
-            { label: 'Branch', value: eng.branch },
-            { label: 'Commit SHA', value: eng.commitSha },
-            { label: 'PR URL', value: eng.prUrl },
-            { label: 'Summary', value: eng.summary }
-          ]}
-        />
-      )
+      return <VcsEventRenderer event={eng} />
     default:
-      // Safe fallback: raw JSON
       return <pre className="event-detail-raw">{JSON.stringify(eng, null, 2)}</pre>
   }
 }

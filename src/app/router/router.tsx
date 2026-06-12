@@ -11,6 +11,7 @@ const ProtectedAppRoute = lazy(() => import('./ProtectedAppRoute').then((module)
 const WorkspaceSplitPage = lazy(() => import('../../pages/workspace/WorkspaceSplitPage').then((module) => ({ default: module.WorkspaceSplitPage })))
 const WorkspaceShell = lazy(() => import('../../features/workspace/components/WorkspaceShell').then((module) => ({ default: module.WorkspaceShell })))
 const MissionView = lazy(() => import('../../features/missions/components/MissionView').then((module) => ({ default: module.MissionView })))
+const MissionList = lazy(() => import('../../features/missions/components/MissionList').then((module) => ({ default: module.MissionList })))
 
 function lazyPage(element: ReactNode) {
   return <Suspense fallback={<div className="page-state">화면을 불러오는 중...</div>}>{element}</Suspense>
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
           { path: 'ch/:channelId/doc/:documentId', element: lazyPage(<WorkspaceSplitPage />) }
         ]
       },
+      { path: '/w/:workspaceId/missions', element: lazyPage(<MissionList />) },
       { path: '/w/:workspaceId/mission/:taskId', element: lazyPage(<MissionView />) }
     ]
   },

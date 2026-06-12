@@ -7,5 +7,6 @@ export const routes = {
   channel: (workspaceId = ':workspaceId', channelId = ':channelId') => `/w/${workspaceId}/ch/${channelId}`,
   document: (workspaceId = ':workspaceId', documentId = ':documentId') => `/w/${workspaceId}/doc/${documentId}`,
   workbench: (workspaceId = ':workspaceId', channelId = ':channelId', documentId = ':documentId') =>
-    `/w/${workspaceId}/ch/${channelId}/doc/${documentId}`
+    `/w/${workspaceId}/ch/${channelId}/doc/${documentId}`,
+  mission: (workspaceId = ':workspaceId', taskId = ':taskId') => `/w/${workspaceId}/mission/${taskId}`
 } as const

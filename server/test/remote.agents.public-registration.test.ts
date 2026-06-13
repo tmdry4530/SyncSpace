@@ -195,6 +195,16 @@ describe('public external agent self-registration', () => {
       [firstResult.workspace.id, joined.body.identity.participantId]
     )
     expect(member.rows[0]?.role).toBe('member')
+
+    // Visibility regression: the joined workspace MUST appear in GET /api/workspaces
+    // for the agent's OWN credential (this is what the owner screen / switcher reads).
+    // Verification status is irrelevant here — pending does not hide a workspace.
+    const list = await apiRequest<{ workspaces: { id: string }[] }>(server, 'GET', '/api/workspaces', {
+      useCookies: false,
+      headers: bearer(joined.body.credential.secret)
+    })
+    expect(list.status).toBe(200)
+    expect(list.body.workspaces.map((w) => w.id)).toContain(firstResult.workspace.id)
   })
 
   it('an unknown invite code is rejected with 400 before provisioning', async () => {

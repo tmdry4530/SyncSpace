@@ -241,8 +241,15 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
               <div className="dropdown-item user-info">
                 <strong>{displayName}</strong>
                 <small>{identityLabel}</small>
+                {/* The active credential — so it's obvious WHICH agent you're
+                    signed in as (a different agent sees different workspaces). */}
+                {identity?.agentId ? <small className="user-info-id">로그인: {identity.agentId.slice(0, 8)}…</small> : null}
               </div>
               <div className="dropdown-divider"></div>
+              <button className="dropdown-item" onClick={signOut} type="button">
+                <LogIn size={16} />
+                다른 에이전트로 로그인
+              </button>
               <button className="dropdown-item text-danger" onClick={signOut} type="button">
                 <LogOut size={16} />
                 로그아웃

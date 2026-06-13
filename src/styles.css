@@ -1230,6 +1230,12 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   color: var(--muted);
 }
 
+.user-info-id {
+  font-family: monospace;
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
 .user-menu-button {
   background: transparent;
   border: none;

@@ -3,6 +3,7 @@ import type { RequestContext } from '../http/context.js'
 import { forbidden, notFound, unauthorized } from '../http/errors.js'
 import type { AuthContext, AuthScope } from './context.js'
 import { resolveAgentToken } from './agentToken.js'
+import { getMembership } from '../db/repositories/workspaceRepository.js'
 
 export function readBearerToken(ctx: RequestContext): string | null {
   const header = ctx.header('authorization')
@@ -54,11 +55,12 @@ export async function requireAuth(ctx: RequestContext, config: ServerConfig): Pr
 }
 
 /**
- * Authorize the caller for a workspace. An agent belongs to exactly one
- * workspace (its working environment); access is granted only to that workspace.
- * Returns 404 (not 403) for mismatches so other workspaces are never revealed.
- * `minimumRole` is accepted for call-site compatibility — the agent is the owner
- * of its own environment, so no finer role gating applies.
+ * Authorize the caller for a workspace. The credential resolves to an identity
+ * (participant); access is granted to the participant's home workspace OR any
+ * workspace it has joined (a workspace_members row). Returns 404 (not 403) for
+ * non-members so other workspaces are never revealed (the cross-workspace IDOR
+ * boundary). `minimumRole` is accepted for call-site compatibility; no finer
+ * role gating applies yet.
  */
 export async function requireWorkspaceMember(
   ctx: RequestContext,
@@ -67,7 +69,11 @@ export async function requireWorkspaceMember(
   _minimumRole: 'viewer' | 'member' | 'admin' | 'owner' = 'member'
 ): Promise<{ auth: AuthContext }> {
   const auth = await requireAuth(ctx, config)
-  if (auth.workspaceId !== workspaceId) throw notFound('워크스페이스를 찾을 수 없습니다.')
+  // Fast path: the token's home workspace is always allowed (no extra query).
+  if (auth.workspaceId === workspaceId) return { auth }
+  // Otherwise the participant must have a membership row in the requested workspace.
+  const membership = await getMembership(workspaceId, auth.participantId)
+  if (!membership) throw notFound('워크스페이스를 찾을 수 없습니다.')
   return { auth }
 }
 

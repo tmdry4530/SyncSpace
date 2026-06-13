@@ -124,7 +124,7 @@ const PIPELINE_STAGES: readonly string[] = ['planning', 'implementation', 'testi
 const PIPELINE_STAGE_STATUSES: readonly string[] = ['pending', 'active', 'done', 'failed']
 
 /** Required string fields per kind, beyond the common `timestamp`. */
-const REQUIRED_STRINGS: Record<EngineeringEventKind, readonly string[]> = {
+export const REQUIRED_STRINGS: Record<EngineeringEventKind, readonly string[]> = {
   agent_status: ['agentId', 'role', 'status', 'currentAction'],
   pipeline_stage: [],
   file_edit: ['agentId', 'path', 'unifiedDiff', 'summary'],
@@ -135,7 +135,7 @@ const REQUIRED_STRINGS: Record<EngineeringEventKind, readonly string[]> = {
 }
 
 /** Required enum-valued fields per kind (field name → allowed values). */
-const REQUIRED_ENUMS: Partial<
+export const REQUIRED_ENUMS: Partial<
   Record<EngineeringEventKind, ReadonlyArray<readonly [string, readonly string[]]>>
 > = {
   pipeline_stage: [

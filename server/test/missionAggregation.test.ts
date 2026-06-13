@@ -197,6 +197,96 @@ describe('cross-task mission aggregation', () => {
     }
   })
 
+  it('GET /api/missions/:contextId?sinceSeq returns only newer events (ascending, boundary excluded)', async () => {
+    // Build a small mission with several engineering events on one context.
+    const origin = await createTaskFromMessage({
+      workspaceId,
+      agentId: ownerAgentId,
+      createdByParticipantId: ownerParticipantId,
+      title: 'Incremental fixture',
+      message: { messageId: newUuid(), parts: [{ text: '증분 픽스처' }], role: 'ROLE_USER' },
+      enqueue: false
+    })
+    const contextId = origin.task.contextId
+    const stamp = new Date().toISOString()
+    for (let i = 0; i < 4; i++) {
+      await appendEvent({
+        taskId: origin.task.id,
+        contextId,
+        eventType: 'agent_status',
+        payload: {
+          kind: 'agent_status',
+          agentId: ownerAgentId,
+          role: 'orchestrator',
+          status: 'working',
+          currentAction: `step ${i}`,
+          timestamp: stamp
+        },
+        visibleToUser: true
+      })
+    }
+
+    // Full load establishes the seq ordering we slice against.
+    const full = await apiRequest<{
+      events: { seq: string; taskId: string }[]
+      tasks: { taskId: string }[]
+      agents: { agentId: string }[]
+    }>(server, 'GET', `/api/missions/${contextId}`, { useCookies: false, headers: bearer(ownerSecret) })
+    expect(full.status).toBe(200)
+    const fullSeqs = full.body.events.map((e) => BigInt(e.seq))
+    expect(fullSeqs.length).toBeGreaterThanOrEqual(4)
+
+    // Pick a boundary in the middle and request the delta after it.
+    const boundaryIdx = Math.floor(fullSeqs.length / 2)
+    const boundary = fullSeqs[boundaryIdx]!
+    const delta = await apiRequest<{
+      events: { seq: string }[]
+      tasks: { taskId: string }[]
+      agents: { agentId: string }[]
+    }>(server, 'GET', `/api/missions/${contextId}?sinceSeq=${boundary.toString()}`, {
+      useCookies: false,
+      headers: bearer(ownerSecret)
+    })
+    expect(delta.status).toBe(200)
+
+    const deltaSeqs = delta.body.events.map((e) => BigInt(e.seq))
+    // Boundary itself must be excluded; everything returned must be strictly newer.
+    expect(deltaSeqs.every((s) => s > boundary)).toBe(true)
+    // Ascending order.
+    for (let i = 1; i < deltaSeqs.length; i++) {
+      expect(deltaSeqs[i]! >= deltaSeqs[i - 1]!).toBe(true)
+    }
+    // Exactly the events after the boundary in the full list.
+    const expectedAfter = fullSeqs.filter((s) => s > boundary)
+    expect(deltaSeqs).toEqual(expectedAfter)
+    // The delta is a superset shape: tasks/agents are intentionally empty.
+    expect(delta.body.tasks).toEqual([])
+    expect(delta.body.agents).toEqual([])
+
+    // Empty delta when sinceSeq is the latest seq.
+    const latest = fullSeqs[fullSeqs.length - 1]!
+    const empty = await apiRequest<{ events: { seq: string }[] }>(
+      server,
+      'GET',
+      `/api/missions/${contextId}?sinceSeq=${latest.toString()}`,
+      { useCookies: false, headers: bearer(ownerSecret) }
+    )
+    expect(empty.status).toBe(200)
+    expect(empty.body.events).toEqual([])
+
+    // Non-numeric sinceSeq is ignored → full load (tasks/agents present again).
+    const fallback = await apiRequest<{
+      events: { seq: string }[]
+      tasks: { taskId: string }[]
+    }>(server, 'GET', `/api/missions/${contextId}?sinceSeq=not-a-number`, {
+      useCookies: false,
+      headers: bearer(ownerSecret)
+    })
+    expect(fallback.status).toBe(200)
+    expect(fallback.body.events.map((e) => e.seq)).toEqual(full.body.events.map((e) => e.seq))
+    expect(fallback.body.tasks.length).toBeGreaterThan(0)
+  })
+
   it('cross-workspace access to GET /api/missions/:contextId returns 404 (IDOR guard)', async () => {
     // Create a mission in workspace A (ownerSecret / workspaceId).
     const task = await createTaskFromMessage({

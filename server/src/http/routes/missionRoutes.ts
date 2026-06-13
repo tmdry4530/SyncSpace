@@ -43,6 +43,30 @@ export function registerMissionRoutes(router: Router, config: ServerConfig): voi
     // requireWorkspaceMember returns 404 for mismatches, preventing IDOR.
     await requireWorkspaceMember(ctx, config, context.workspace_id)
 
+    const missionMeta = {
+      contextId: context.id,
+      workspaceId: context.workspace_id,
+      channelId: context.channel_id,
+      createdAt: context.created_at
+    }
+
+    // Incremental fetch: a valid ?sinceSeq returns only the events strictly newer
+    // than that seq, in seq order, and skips task/agent resolution (the client
+    // already has them). seq is a Postgres bigint kept as a string on the wire.
+    // A non-numeric value is ignored → full load (the client falls back safely).
+    const sinceSeqParam = ctx.query.get('sinceSeq')
+    if (sinceSeqParam && /^\d+$/.test(sinceSeqParam)) {
+      const deltaRows = await listEventsByContext(contextId, sinceSeqParam)
+      const deltaEvents = deltaRows.map((row) => ({
+        seq: row.seq,
+        taskId: row.task_id,
+        type: row.event_type,
+        createdAt: row.created_at,
+        payload: mapEventRowToStreamResponse(row)
+      }))
+      return json({ mission: missionMeta, events: deltaEvents, tasks: [], agents: [] })
+    }
+
     const [eventRows, taskRows] = await Promise.all([
       listEventsByContext(contextId),
       listContextTasks(contextId)
@@ -86,12 +110,7 @@ export function registerMissionRoutes(router: Router, config: ServerConfig): voi
     }))
 
     return json({
-      mission: {
-        contextId: context.id,
-        workspaceId: context.workspace_id,
-        channelId: context.channel_id,
-        createdAt: context.created_at
-      },
+      mission: missionMeta,
       events,
       tasks,
       agents

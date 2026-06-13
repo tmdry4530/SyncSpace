@@ -3,13 +3,15 @@ import type { Router } from '../router.js'
 import { json } from '../response.js'
 import { badRequest, notFound } from '../errors.js'
 import { requireAgentActor, requireAuth, requireWorkspaceMember } from '../../auth/middleware.js'
+import { ensureWorkspaceAgentPresence } from '../../auth/agentRegistration.js'
 import { hashIp } from '../../utils/crypto.js'
 import {
   addWorkspaceMember,
   deleteWorkspace,
   getWorkspaceByInviteCode,
   getWorkspaceById,
-  listWorkspacesForParticipant
+  listWorkspacesForParticipant,
+  rotateInviteCode
 } from '../../db/repositories/workspaceRepository.js'
 import { createChannel, listChannels } from '../../db/repositories/channelRepository.js'
 import { createDocument, listDocuments } from '../../db/repositories/documentRepository.js'
@@ -43,6 +45,10 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
     const workspace = await getWorkspaceByInviteCode(code)
     if (!workspace) throw badRequest('invalid_invite_code', '유효하지 않은 초대 코드입니다.')
     await addWorkspaceMember({ workspaceId: workspace.id, participantId: auth.participantId, role: 'member' })
+    // Give the joining identity an actable presence agent in this workspace so it
+    // can be @mentioned and run tasks here (not just read). Idempotent; awaited so
+    // a failure surfaces as a 500 rather than a silent half-join.
+    await ensureWorkspaceAgentPresence(auth.credentialParticipantId, workspace.id)
     await writeAuditLog({
       workspaceId: workspace.id,
       actorParticipantId: auth.participantId,
@@ -53,6 +59,24 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
       userAgent: ctx.header('user-agent')
     }).catch(() => undefined)
     return json({ workspace })
+  })
+
+  // Regenerate the invite code. A member may rotate it (workspace management is
+  // acceptable in the observe-only model); the old code stops resolving at once.
+  router.post('/api/workspaces/:workspaceId/invite-code/rotate', async (ctx) => {
+    const workspaceId = ctx.params.workspaceId ?? ''
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId)
+    const inviteCode = await rotateInviteCode(workspaceId)
+    await writeAuditLog({
+      workspaceId,
+      actorParticipantId: auth.participantId,
+      action: 'workspace.invite_code_rotate',
+      resourceType: 'workspace',
+      resourceId: workspaceId,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    }).catch(() => undefined)
+    return json({ inviteCode })
   })
 
   router.delete('/api/workspaces/:workspaceId', async (ctx) => {

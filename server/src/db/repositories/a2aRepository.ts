@@ -421,7 +421,25 @@ export async function getEventBySeq(seq: string, client?: Queryable): Promise<A2
  */
 const MISSION_EVENT_LIMIT = 1000
 
-export async function listEventsByContext(contextId: string, client?: Queryable): Promise<A2aTaskEventRow[]> {
+export async function listEventsByContext(
+  contextId: string,
+  sinceSeq?: string | null,
+  client?: Queryable
+): Promise<A2aTaskEventRow[]> {
+  // Incremental delta: every visible event strictly newer than sinceSeq, in seq
+  // order. Uncapped — a delta is bounded by how stale the client was, not by the
+  // whole mission, and the client merges it into its cache.
+  if (sinceSeq) {
+    return query<A2aTaskEventRow>(
+      `select * from a2a_task_events
+       where context_id = $1 and visible_to_user and seq > $2
+       order by seq asc`,
+      [contextId, sinceSeq],
+      client
+    )
+  }
+  // Full load: the NEWEST MISSION_EVENT_LIMIT rows (inner desc, outer asc) so an
+  // unbounded mission cannot blow up the response; the tail is what the view needs.
   return query<A2aTaskEventRow>(
     `select * from (
        select * from a2a_task_events

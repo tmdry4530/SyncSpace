@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { routes } from '../../app/router/routes'
-import { agentLogin, registerAgent, requestChallenge } from '../../shared/api/authApi'
+import { agentLogin, fetchRegistrationConfig, registerAgent, requestChallenge } from '../../shared/api/authApi'
 import { toAppError } from '../../shared/api/errors'
 import { useAuthStore } from '../../shared/stores/authStore'
 import { AGENT_ROLE_LABELS } from '../../features/agents/agentDisplay'
@@ -39,6 +39,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setSubmitting] = useState(false)
 
+  // null until fetched; we optimistically assume internal creation is enabled so
+  // the UI doesn't flash a disabled state on first paint.
+  const [internalRegistrationEnabled, setInternalRegistrationEnabled] = useState(true)
+
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname
   const skillUrl = `${window.location.origin}/skill.md`
 
@@ -46,6 +50,18 @@ export function LoginPage() {
     // Don't redirect while the issued secret is still on screen — the owner must copy it first.
     if (identity && !issuedSecret) navigate(from ?? routes.workspace(identity.workspaceId), { replace: true })
   }, [from, identity, issuedSecret, navigate])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchRegistrationConfig()
+      .then((config) => {
+        if (!cancelled) setInternalRegistrationEnabled(config.internalEnabled)
+      })
+      .catch(() => undefined) // Non-fatal: keep the optimistic default on failure.
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function enterApp(next: AuthAgentIdentity) {
     setIdentity(next)
@@ -217,6 +233,12 @@ export function LoginPage() {
               {isSubmitting ? '확인 중...' : '로그인'}
             </button>
           </form>
+        ) : !internalRegistrationEnabled ? (
+          <div className="stack">
+            <p className="auth-hint" role="note">
+              이 배포에서는 내부 생성이 비활성화되어 있습니다 — 외부 Agent Card로 등록하세요.
+            </p>
+          </div>
         ) : (
           <form className="stack" onSubmit={handleRegister}>
             {challenge ? (

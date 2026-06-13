@@ -26,6 +26,16 @@ export interface ExternalAgentRegistrationInput {
   workspaceName?: string
 }
 
+/** Whether each self-service registration path is open on this deployment. */
+export interface RegistrationConfig {
+  internalEnabled: boolean
+  externalEnabled: boolean
+}
+
+export async function fetchRegistrationConfig(): Promise<RegistrationConfig> {
+  return getBackendJson<RegistrationConfig>('/api/auth/registration-config')
+}
+
 export async function requestChallenge(): Promise<RegistrationChallenge> {
   return postBackendJson<RegistrationChallenge>('/api/agents/register/challenge')
 }

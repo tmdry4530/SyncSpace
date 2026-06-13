@@ -307,6 +307,15 @@ export function registerAuthRoutes(router: Router, config: ServerConfig): void {
     return json({ ok: true }, 200, { 'set-cookie': buildSessionClearCookie(config) })
   })
 
+  // Public: lets the login UI render the right affordances instead of letting a
+  // user submit into a 403. Leaks only the two booleans the gate already implies.
+  router.get('/api/auth/registration-config', async (_ctx) => {
+    return json({
+      internalEnabled: registrationAllowed(config),
+      externalEnabled: externalRegistrationAllowed(config)
+    })
+  })
+
   router.get('/api/auth/me', async (ctx) => {
     const auth = await optionalAuth(ctx, config)
     if (!auth) return json({ identity: null }, 200)

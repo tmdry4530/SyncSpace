@@ -118,6 +118,23 @@ describe('agent registration + auth surface', () => {
     expect(list.body.workspaces.some((w) => w.id === workspaceId)).toBe(true)
   })
 
+  it('exposes registration availability without auth', async () => {
+    const res = await apiRequest<{ internalEnabled: boolean; externalEnabled: boolean }>(
+      server,
+      'GET',
+      '/api/auth/registration-config',
+      { useCookies: false }
+    )
+    expect(res.status).toBe(200)
+    expect(typeof res.body.internalEnabled).toBe('boolean')
+    expect(typeof res.body.externalEnabled).toBe('boolean')
+    // Test config runs with nodeEnv !== 'production', so both paths are open.
+    expect(res.body.internalEnabled).toBe(true)
+    expect(res.body.externalEnabled).toBe(true)
+    // Nothing beyond the two booleans should leak.
+    expect(Object.keys(res.body).sort()).toEqual(['externalEnabled', 'internalEnabled'])
+  })
+
   it('logs out and clears the session cookie', async () => {
     await apiRequest(server, 'POST', '/api/auth/logout')
     const me = await apiRequest<{ identity: AuthAgentIdentity | null }>(server, 'GET', '/api/auth/me')

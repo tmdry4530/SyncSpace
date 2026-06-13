@@ -8,7 +8,8 @@ import { agentRoleLabel } from '../../agents/agentDisplay'
 import { agentIdentityToProfile } from '../../../shared/api/profiles'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
 import { useJoinWorkspaceMutation } from '../queries/useJoinWorkspaceMutation'
-import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn } from 'lucide-react'
+import { useRotateInviteCodeMutation } from '../queries/useRotateInviteCodeMutation'
+import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn, RefreshCw } from 'lucide-react'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate()
@@ -22,7 +23,9 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const [joinFormOpen, setJoinFormOpen] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState<string | null>(null)
+  const [rotateError, setRotateError] = useState<string | null>(null)
   const joinMutation = useJoinWorkspaceMutation()
+  const rotateMutation = useRotateInviteCodeMutation()
   const workspace = workspaces.find((item) => item.id === workspaceId)
   const displayName = formatDisplayName(identity?.displayName)
   const chipColor = identity ? agentIdentityToProfile(identity).color : '#94a3b8'
@@ -91,6 +94,17 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
     await writeClipboard(workspace.inviteCode)
     setCopied(true)
     window.setTimeout(() => setCopied(false), 1600)
+  }
+
+  async function rotateInviteCode() {
+    if (rotateMutation.isPending) return
+    setRotateError(null)
+    try {
+      // The shown code refreshes via the workspaces list invalidation.
+      await rotateMutation.mutateAsync(workspaceId)
+    } catch (error) {
+      setRotateError(error instanceof Error ? error.message : '코드 재발급에 실패했습니다.')
+    }
   }
 
   return (
@@ -192,6 +206,17 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
                     {copied ? '복사됨' : '복사'}
                   </button>
                 </div>
+                <button
+                  className="button ghost small invite-rotate-button"
+                  onClick={rotateInviteCode}
+                  type="button"
+                  disabled={rotateMutation.isPending}
+                  aria-label="초대 코드 재발급"
+                >
+                  <RefreshCw size={16} aria-hidden="true" />
+                  {rotateMutation.isPending ? '재발급 중…' : '코드 재발급'}
+                </button>
+                {rotateError && <p className="workspace-join-error">{rotateError}</p>}
               </div>
             )}
           </div>

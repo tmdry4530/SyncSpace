@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronLeft, LayoutGrid, PanelLeftOpen, X } from 'lucide-react'
+import { ChevronLeft, ClipboardList, LayoutGrid, PanelLeftOpen, X } from 'lucide-react'
 import { routes } from '../../../app/router/routes'
 import { ChannelList } from '../../channel/components/ChannelList'
 import { DocumentList } from '../../documents/components/DocumentList'
@@ -42,6 +42,10 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
           <Link aria-label="워크스페이스 홈" className="sidebar-workspace-link" title="워크스페이스" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
             <LayoutGrid aria-hidden="true" size={16} />
             <span className="nav-label">워크스페이스</span>
+          </Link>
+          <Link aria-label="미션 목록" className="sidebar-workspace-link sidebar-missions-link" title="미션" to={routes.missions(workspaceId)} onClick={onMobileClose}>
+            <ClipboardList aria-hidden="true" size={16} />
+            <span className="nav-label">미션</span>
           </Link>
         </div>
         <div className="sidebar-section sidebar-section--channels">

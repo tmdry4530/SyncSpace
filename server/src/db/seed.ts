@@ -3,6 +3,8 @@ import { isMainModule } from './migrate.js'
 import { queryOne } from './query.js'
 import { readConfig } from '../config.js'
 import { registerAgent } from '../auth/agentRegistration.js'
+import { getAgentBySlug } from './repositories/agentRepository.js'
+import { seedDemoMission } from '../demo/missionDemo.js'
 
 /**
  * Idempotent development seed. Registers one demo agent (which also provisions a
@@ -29,6 +31,22 @@ export async function seed(logger: (message: string) => void = (m) => console.lo
   logger(`registered demo agent ${result.credential.agentId} in workspace ${result.workspace.id}`)
   logger(`DEMO_AGENT_ID=${result.credential.agentId}`)
   logger(`DEMO_SECRET=${result.credential.secret}`)
+
+  // Seed the demo mission using the orchestrator agent so all FKs are valid.
+  const workspaceId = result.workspace.id
+  const createdByParticipantId = result.identity.participantId
+
+  // Prefer the orchestrator from the default roster; fall back to the registered agent.
+  const orchestrator = await getAgentBySlug(workspaceId, 'orchestrator')
+  const agentId = orchestrator?.id ?? result.credential.agentId
+
+  try {
+    const { contextId } = await seedDemoMission({ workspaceId, agentId, createdByParticipantId })
+    logger('DEMO mission seeded — open the Mission View at:')
+    logger(`http://localhost:5173/w/${workspaceId}/mission/${contextId}`)
+  } catch (err) {
+    logger(`WARNING: demo mission seed failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`)
+  }
 }
 
 async function main(): Promise<void> {

@@ -59,6 +59,13 @@ export interface DispatchMentionsInput {
   authorRemoteAgentId?: string | null
   /** Hop count of the message that produced this output (0 = human-triggered). */
   hops: number
+  /**
+   * When set, the collaboration task joins the SAME a2a context as the origin
+   * task so that all agents in one collaboration chain share a single mission
+   * context.  The workspace IDOR guard in createTaskFromMessage (context.workspace_id
+   * must equal input.workspaceId) is preserved — collaboration is same-workspace.
+   */
+  originContextId?: string | null
   logger: Logger
 }
 
@@ -117,6 +124,10 @@ async function createCollabTask(
     workspaceId: input.workspaceId,
     ...target,
     channelId: input.channelId,
+    // Join the origin context so the entire collaboration chain (orchestrator →
+    // @planner → @builder → @reviewer) shares a single a2a context = one mission.
+    // createTaskFromMessage already guards context.workspace_id === workspaceId.
+    ...(input.originContextId ? { contextId: input.originContextId } : {}),
     createdByParticipantId: input.authorParticipantId,
     message: {
       messageId: newUuid(),

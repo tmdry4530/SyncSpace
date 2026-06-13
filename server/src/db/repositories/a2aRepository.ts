@@ -340,7 +340,20 @@ export async function listArtifacts(taskId: string, client?: Queryable): Promise
 
 // ---------- Events (ordered, with LISTEN/NOTIFY) ----------
 
-export type A2aEventType = 'task_snapshot' | 'message' | 'status_update' | 'artifact_update' | 'push_delivery' | 'debug'
+export type A2aEventType =
+  | 'task_snapshot'
+  | 'message'
+  | 'status_update'
+  | 'artifact_update'
+  | 'push_delivery'
+  | 'debug'
+  | 'agent_status'
+  | 'pipeline_stage'
+  | 'file_edit'
+  | 'command_run'
+  | 'test_result'
+  | 'review_comment'
+  | 'vcs_event'
 
 export interface A2aTaskEventRow {
   id: string
@@ -395,4 +408,52 @@ export async function listEvents(taskId: string, sinceSeq?: string | null, clien
 
 export async function getEventBySeq(seq: string, client?: Queryable): Promise<A2aTaskEventRow | null> {
   return queryOne<A2aTaskEventRow>(`select * from a2a_task_events where seq = $1`, [seq], client)
+}
+
+/**
+ * User-visible events for a context, across every task in the collaboration
+ * chain, ordered by seq ascending.  Used by the Mission View to show the
+ * engineering timeline for a shared a2a context (= one mission).
+ *
+ * Capped at the NEWEST `MISSION_EVENT_LIMIT` rows (inner desc, outer asc) so
+ * an unbounded mission cannot blow up the response; the tail of the story is
+ * what the Mission View needs.
+ */
+const MISSION_EVENT_LIMIT = 1000
+
+export async function listEventsByContext(contextId: string, client?: Queryable): Promise<A2aTaskEventRow[]> {
+  return query<A2aTaskEventRow>(
+    `select * from (
+       select * from a2a_task_events
+       where context_id = $1 and visible_to_user
+       order by seq desc
+       limit ${MISSION_EVENT_LIMIT}
+     ) latest
+     order by seq asc`,
+    [contextId],
+    client
+  )
+}
+
+export interface ContextTaskSummaryRow {
+  id: string
+  agent_id: string | null
+  status_state: A2aTaskState
+  title: string | null
+  created_at: string
+}
+
+/**
+ * Lightweight task summary for all tasks belonging to a context.
+ * Used by the Mission View to list participating agents and their states.
+ */
+export async function listContextTasks(contextId: string, client?: Queryable): Promise<ContextTaskSummaryRow[]> {
+  return query<ContextTaskSummaryRow>(
+    `select id, agent_id, status_state, title, created_at
+     from a2a_tasks
+     where context_id = $1
+     order by created_at asc`,
+    [contextId],
+    client
+  )
 }

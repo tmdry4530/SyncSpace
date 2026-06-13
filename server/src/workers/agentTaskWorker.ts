@@ -11,6 +11,7 @@ import type { AgentEmitter, AgentRunContext } from '../agents/runtime.js'
 import { dispatchAgentMentions, readHops } from '../agents/mentionDispatcher.js'
 import { buildChannelTranscript } from '../agents/conversation.js'
 import { enqueuePushForTask } from './pushNotificationWorker.js'
+import { emitAgentStarted, emitAgentCompleted, emitAgentFailed, emitReviewComment } from '../agents/collabEvents.js'
 
 const AGENT_TASK_TIMEOUT_MS = 60_000
 
@@ -53,6 +54,9 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), AGENT_TASK_TIMEOUT_MS)
 
+  // Capture the last reviewer message text for review_comment event emission.
+  let lastReviewerMessageText = ''
+
   const emit: AgentEmitter = {
     status: async (state: A2aTaskState, summaryText?: string) => {
       await setTaskStatus(taskId, state, summaryText ? statusMessage(summaryText) : null)
@@ -91,8 +95,15 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
           authorParticipantId: agent.participant_id,
           authorInternalAgentId: agent.id,
           hops,
+          // Pass the current task's context so all collaboration tasks in the
+          // same chain share one a2a context (= one mission in the Mission View).
+          originContextId: task.context_id,
           logger: deps.logger
         })
+      }
+      // Capture reviewer message text for review_comment event (emitted after run).
+      if (agent.role === 'reviewer') {
+        lastReviewerMessageText = firstText(parts)
       }
     },
     appendDocument: async (markdown: string) => {
@@ -126,17 +137,43 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
 
   try {
     await updateAgentStatus(agent.id, 'running')
+    // Collaboration-progress engineering events: the emitters log and
+    // swallow all their own errors, so no catch is needed at call sites.
+    await emitAgentStarted(taskId, task.context_id, agent.id, agent.role, deps.logger)
+
     await getAgentRuntime(agent.role).run(ctx)
+
+    // The runtime can end the task FAILED/CANCELED without throwing (provider
+    // errors and timeouts are absorbed inside run; cancellation can land
+    // mid-run), so the engineering events must follow the FINAL task state —
+    // never record done/review events for a task that did not complete.
     const finalTask = await getTask(taskId)
+    const endedUnsuccessfully =
+      finalTask !== null &&
+      isTerminalState(finalTask.status_state) &&
+      finalTask.status_state !== 'TASK_STATE_COMPLETED'
+
     if (finalTask && !isTerminalState(finalTask.status_state)) {
       await setTaskStatus(taskId, 'TASK_STATE_COMPLETED', statusMessage('완료되었습니다.'))
       await enqueuePushForTask(taskId).catch(() => undefined)
     }
-    await updateAgentStatus(agent.id, 'idle')
+
+    if (endedUnsuccessfully) {
+      await emitAgentFailed(taskId, task.context_id, agent.id, agent.role, deps.logger)
+      await updateAgentStatus(agent.id, finalTask.status_state === 'TASK_STATE_FAILED' ? 'failed' : 'idle')
+    } else {
+      // Reviewer: emit review_comment with the actual reviewer message text.
+      if (agent.role === 'reviewer') {
+        await emitReviewComment(taskId, task.context_id, agent.id, lastReviewerMessageText, deps.logger)
+      }
+      await emitAgentCompleted(taskId, task.context_id, agent.id, agent.role, deps.logger)
+      await updateAgentStatus(agent.id, 'idle')
+    }
   } catch (error) {
     deps.logger.error('Agent task failed', { taskId, error: error instanceof Error ? error.message : String(error) })
     await setTaskStatus(taskId, 'TASK_STATE_FAILED', statusMessage('처리 중 오류가 발생했습니다.'))
     await enqueuePushForTask(taskId).catch(() => undefined)
+    await emitAgentFailed(taskId, task.context_id, agent.id, agent.role, deps.logger)
     await updateAgentStatus(agent.id, 'failed').catch(() => undefined)
     throw error
   } finally {

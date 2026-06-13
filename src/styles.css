@@ -118,8 +118,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 
 .eyebrow {
   color: var(--muted-strong);
-  letter-spacing: 0.12em;
-  font-size: 0.67rem;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
   font-weight: 800;
   text-transform: uppercase;
   margin: 0 0 0.55rem;
@@ -635,7 +635,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 .sidebar-workspace-link { color: #fff; background: rgba(30,41,59,0.72); font-weight: 600; }
 .sidebar-workspace-link:hover { background: rgba(30,41,59,0.95); }
@@ -792,7 +792,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .status-pill.connected { color: #047857; background: #ecfdf5; }
 .status-pill.connecting { color: #b45309; background: #fffbeb; }
 .status-pill.disconnected { color: #b91c1c; background: #fef2f2; }
-.status-pill.idle { color: #64748b; background: #f1f5f9; }
+.status-pill.idle { color: #475569; background: #f1f5f9; }
 
 .spectator-badge {
   display: inline-flex;
@@ -1092,7 +1092,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   padding: 2rem;
   text-align: center;
 }
-.empty-split-pane h2 { margin: 0; font-size: clamp(1.7rem, 4vw, 3rem); letter-spacing: -0.06em; }
+.empty-split-pane h2 { margin: 0; font-size: clamp(1.15rem, 2.2vw, 1.5rem); font-weight: 700; letter-spacing: -0.03em; color: var(--text); }
 .empty-split-pane p:not(.eyebrow) { margin: 0; color: var(--muted); line-height: 1.7; max-width: 24rem; }
 
 /* Contract / report */
@@ -1360,7 +1360,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   background-color: var(--surface);
   color: var(--muted-strong);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .icon-button:hover {
@@ -3226,6 +3226,10 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .pipeline-stage--failed .pipeline-stage-index { background: var(--danger); color: #fff; }
 
 .pipeline-stage-label { font-weight: 600; flex: 1; }
+.pipeline-stage-status { flex-shrink: 0; align-self: center; font-size: 0.64rem; font-weight: 700; color: var(--muted-strong); }
+.pipeline-stage--active .pipeline-stage-status { color: var(--accent-2); }
+.pipeline-stage--failed .pipeline-stage-status { color: var(--danger); }
+.pipeline-stage--done .pipeline-stage-status { color: var(--muted); }
 .pipeline-stage-summary { color: var(--muted); font-size: 0.66rem; align-self: center; }
 
 /* Roster */
@@ -3983,4 +3987,56 @@ details[open] .raw-inspect-toggle::before { content: '▾'; }
   }
   .mission-list-time,
   .mission-list-id { display: none; }
+}
+
+/* ── Mission detail: stack the desktop-only 3-column layout on small screens.
+   The base layout is `240px / 1fr / 280px` inside `height:100vh; overflow:hidden`,
+   which is unusable below ~820px — let it flow vertically and scroll instead. ── */
+@media (max-width: 820px) {
+  .mission-view {
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: visible;
+  }
+  .mission-layout {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+  .mission-left {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+/* ── Touch devices: meet the 44px minimum tap target without shrinking
+   desktop density (controls stay 32-40px on mouse/trackpad). ── */
+@media (pointer: coarse) {
+  .button,
+  button,
+  .icon-button,
+  .dropdown-item,
+  .workspace-switch-trigger,
+  .invite-trigger,
+  .user-menu-button {
+    min-height: 44px;
+  }
+  .small { min-height: 40px; }
+  input { min-height: 44px; }
+}
+
+/* ── Honor the user's reduced-motion preference (was entirely absent). ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:hover,
+  .button:hover,
+  .workspace-tile:hover,
+  .workspace-tile:focus-within { transform: none !important; }
 }

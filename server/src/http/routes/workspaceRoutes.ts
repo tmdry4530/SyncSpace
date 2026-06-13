@@ -9,7 +9,8 @@ import {
   deleteWorkspace,
   getWorkspaceByInviteCode,
   getWorkspaceById,
-  listWorkspacesForParticipant
+  listWorkspacesForParticipant,
+  rotateInviteCode
 } from '../../db/repositories/workspaceRepository.js'
 import { createChannel, listChannels } from '../../db/repositories/channelRepository.js'
 import { createDocument, listDocuments } from '../../db/repositories/documentRepository.js'
@@ -53,6 +54,24 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
       userAgent: ctx.header('user-agent')
     }).catch(() => undefined)
     return json({ workspace })
+  })
+
+  // Regenerate the invite code. A member may rotate it (workspace management is
+  // acceptable in the observe-only model); the old code stops resolving at once.
+  router.post('/api/workspaces/:workspaceId/invite-code/rotate', async (ctx) => {
+    const workspaceId = ctx.params.workspaceId ?? ''
+    const { auth } = await requireWorkspaceMember(ctx, config, workspaceId)
+    const inviteCode = await rotateInviteCode(workspaceId)
+    await writeAuditLog({
+      workspaceId,
+      actorParticipantId: auth.participantId,
+      action: 'workspace.invite_code_rotate',
+      resourceType: 'workspace',
+      resourceId: workspaceId,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    }).catch(() => undefined)
+    return json({ inviteCode })
   })
 
   router.delete('/api/workspaces/:workspaceId', async (ctx) => {

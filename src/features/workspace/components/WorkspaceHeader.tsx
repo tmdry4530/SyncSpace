@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { routes } from '../../../app/router/routes'
 import { logout } from '../../../shared/api/authApi'
@@ -7,7 +7,8 @@ import { formatDisplayName } from '../../../shared/utils/displayName'
 import { agentRoleLabel } from '../../agents/agentDisplay'
 import { agentIdentityToProfile } from '../../../shared/api/profiles'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
-import { Copy, Check, LogOut, User, KeyRound, ChevronDown } from 'lucide-react'
+import { useJoinWorkspaceMutation } from '../queries/useJoinWorkspaceMutation'
+import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn } from 'lucide-react'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate()
@@ -17,6 +18,11 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const [copied, setCopied] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [joinFormOpen, setJoinFormOpen] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
+  const [joinError, setJoinError] = useState<string | null>(null)
+  const joinMutation = useJoinWorkspaceMutation()
   const workspace = workspaces.find((item) => item.id === workspaceId)
   const displayName = formatDisplayName(identity?.displayName)
   const chipColor = identity ? agentIdentityToProfile(identity).color : '#94a3b8'
@@ -25,6 +31,7 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
     : ''
   const menuRef = useRef<HTMLDivElement>(null)
   const inviteRef = useRef<HTMLDivElement>(null)
+  const workspaceMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -34,10 +41,41 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
       if (inviteRef.current && !inviteRef.current.contains(event.target as Node)) {
         setInviteOpen(false)
       }
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(event.target as Node)) {
+        setWorkspaceMenuOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  function closeWorkspaceMenu() {
+    setWorkspaceMenuOpen(false)
+    setJoinFormOpen(false)
+    setJoinCode('')
+    setJoinError(null)
+  }
+
+  function selectWorkspace(targetId: string) {
+    closeWorkspaceMenu()
+    if (targetId !== workspaceId) {
+      navigate(routes.workspace(targetId))
+    }
+  }
+
+  async function submitJoinCode(event: FormEvent) {
+    event.preventDefault()
+    const code = joinCode.trim()
+    if (!code || joinMutation.isPending) return
+    setJoinError(null)
+    try {
+      const result = await joinMutation.mutateAsync(code)
+      closeWorkspaceMenu()
+      navigate(routes.workspace(result.workspace.id))
+    } catch (error) {
+      setJoinError(error instanceof Error ? error.message : '초대 코드로 합류하지 못했습니다.')
+    }
+  }
 
   async function signOut() {
     try {
@@ -59,7 +97,72 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
     <header className="workspace-header">
       <div className="header-brand">
         <p className="eyebrow">현재 워크스페이스</p>
-        <h2>{workspace?.name ?? '워크스페이스'}</h2>
+        <div className="dropdown-container" ref={workspaceMenuRef}>
+          <button
+            className={workspaceMenuOpen ? 'workspace-switch-trigger open' : 'workspace-switch-trigger'}
+            onClick={() => (workspaceMenuOpen ? closeWorkspaceMenu() : setWorkspaceMenuOpen(true))}
+            aria-expanded={workspaceMenuOpen}
+            aria-label="워크스페이스 전환"
+            type="button"
+          >
+            <h2>{workspace?.name ?? '워크스페이스'}</h2>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+
+          {workspaceMenuOpen && (
+            <div className="dropdown-menu workspace-switch-menu">
+              <div className="dropdown-header">워크스페이스</div>
+              {workspaces.map((item) => {
+                const active = item.id === workspaceId
+                return (
+                  <button
+                    key={item.id}
+                    className={active ? 'dropdown-item workspace-switch-item active' : 'dropdown-item workspace-switch-item'}
+                    onClick={() => selectWorkspace(item.id)}
+                    type="button"
+                    aria-current={active ? 'true' : undefined}
+                  >
+                    <span className="workspace-switch-name">{item.name}</span>
+                    {active && <Check size={16} aria-hidden="true" />}
+                  </button>
+                )
+              })}
+              <div className="dropdown-divider"></div>
+              {joinFormOpen ? (
+                <form className="workspace-join-form" onSubmit={submitJoinCode}>
+                  <input
+                    className="workspace-join-input"
+                    value={joinCode}
+                    onChange={(event) => setJoinCode(event.target.value)}
+                    placeholder="초대 코드"
+                    aria-label="초대 코드"
+                    autoFocus
+                  />
+                  <button
+                    className="button primary small"
+                    type="submit"
+                    disabled={joinMutation.isPending || joinCode.trim().length === 0}
+                  >
+                    {joinMutation.isPending ? '합류 중…' : '합류'}
+                  </button>
+                  {joinError && <p className="workspace-join-error">{joinError}</p>}
+                </form>
+              ) : (
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    setJoinFormOpen(true)
+                    setJoinError(null)
+                  }}
+                  type="button"
+                >
+                  <LogIn size={16} aria-hidden="true" />
+                  초대 코드로 합류
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="header-actions">

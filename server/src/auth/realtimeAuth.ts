@@ -5,6 +5,7 @@ import type { ParticipantType } from '../types/contracts.js'
 import type { Logger } from '../utils/logger.js'
 import { parseCookies } from '../http/context.js'
 import { resolveAgentToken } from './agentToken.js'
+import { getMembership } from '../db/repositories/workspaceRepository.js'
 
 export interface RealtimeAuthContext {
   request: IncomingMessage
@@ -63,7 +64,11 @@ export class AgentRealtimeAuthorizer implements RealtimeAuthorizer {
     try {
       const agent = await resolveAgentToken(this.config, source.token)
       if (!agent) return { ok: false, reason: 'invalid_credential' }
-      if (agent.workspaceId !== context.route.workspaceId) return { ok: false, reason: 'not_workspace_member' }
+      // Home workspace OR any joined workspace (membership row) may connect.
+      if (agent.workspaceId !== context.route.workspaceId) {
+        const membership = await getMembership(context.route.workspaceId, agent.participantId)
+        if (!membership) return { ok: false, reason: 'not_workspace_member' }
+      }
       const principalId = agent.agentId ?? agent.remoteAgentId
       return {
         ok: true,

@@ -5,7 +5,9 @@ import { badRequest, notFound } from '../errors.js'
 import { requireAgentActor, requireAuth, requireWorkspaceMember } from '../../auth/middleware.js'
 import { hashIp } from '../../utils/crypto.js'
 import {
+  addWorkspaceMember,
   deleteWorkspace,
+  getWorkspaceByInviteCode,
   getWorkspaceById,
   listWorkspacesForParticipant
 } from '../../db/repositories/workspaceRepository.js'
@@ -27,6 +29,30 @@ export function registerWorkspaceRoutes(router: Router, config: ServerConfig): v
   router.get('/api/workspaces', async (ctx) => {
     const auth = await requireAuth(ctx, config)
     return json({ workspaces: await listWorkspacesForParticipant(auth.participantId) })
+  })
+
+  // Join an existing workspace by invite code under the CALLER's identity (reuses
+  // its participant — no new credential), so one identity can belong to and
+  // switch between many workspaces. Authenticated; a spectator may join too
+  // (joining is an identity action, not workspace activity).
+  router.post('/api/workspaces/join', async (ctx) => {
+    const auth = await requireAuth(ctx, config)
+    const body = await ctx.json<{ inviteCode?: string }>()
+    const code = typeof body.inviteCode === 'string' ? body.inviteCode.trim() : ''
+    if (!code) throw badRequest('missing_invite_code', '초대 코드가 필요합니다.')
+    const workspace = await getWorkspaceByInviteCode(code)
+    if (!workspace) throw badRequest('invalid_invite_code', '유효하지 않은 초대 코드입니다.')
+    await addWorkspaceMember({ workspaceId: workspace.id, participantId: auth.participantId, role: 'member' })
+    await writeAuditLog({
+      workspaceId: workspace.id,
+      actorParticipantId: auth.participantId,
+      action: 'workspace.join',
+      resourceType: 'workspace',
+      resourceId: workspace.id,
+      ipHash: hashIp(ctx.ip, config.authSecret),
+      userAgent: ctx.header('user-agent')
+    }).catch(() => undefined)
+    return json({ workspace })
   })
 
   router.delete('/api/workspaces/:workspaceId', async (ctx) => {

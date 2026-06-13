@@ -137,35 +137,43 @@ export async function processAgentTaskJob(payload: Record<string, unknown>, deps
 
   try {
     await updateAgentStatus(agent.id, 'running')
-    // Emit collaboration-progress engineering events: agent started.
+    // Collaboration-progress engineering events: the emitters log and
+    // swallow all their own errors, so no catch is needed at call sites.
     await emitAgentStarted(taskId, task.context_id, agent.id, agent.role, deps.logger)
-      .catch((err) => deps.logger.warn('emitAgentStarted failed', { taskId, error: String(err) }))
 
     await getAgentRuntime(agent.role).run(ctx)
 
-    // Reviewer: emit review_comment with the actual reviewer message text.
-    if (agent.role === 'reviewer') {
-      await emitReviewComment(taskId, task.context_id, agent.id, lastReviewerMessageText, deps.logger)
-        .catch((err) => deps.logger.warn('emitReviewComment failed', { taskId, error: String(err) }))
-    }
-
+    // The runtime can end the task FAILED/CANCELED without throwing (provider
+    // errors and timeouts are absorbed inside run; cancellation can land
+    // mid-run), so the engineering events must follow the FINAL task state —
+    // never record done/review events for a task that did not complete.
     const finalTask = await getTask(taskId)
+    const endedUnsuccessfully =
+      finalTask !== null &&
+      isTerminalState(finalTask.status_state) &&
+      finalTask.status_state !== 'TASK_STATE_COMPLETED'
+
     if (finalTask && !isTerminalState(finalTask.status_state)) {
       await setTaskStatus(taskId, 'TASK_STATE_COMPLETED', statusMessage('완료되었습니다.'))
       await enqueuePushForTask(taskId).catch(() => undefined)
     }
-    // Emit collaboration-progress engineering events: agent completed.
-    await emitAgentCompleted(taskId, task.context_id, agent.id, agent.role, deps.logger)
-      .catch((err) => deps.logger.warn('emitAgentCompleted failed', { taskId, error: String(err) }))
 
-    await updateAgentStatus(agent.id, 'idle')
+    if (endedUnsuccessfully) {
+      await emitAgentFailed(taskId, task.context_id, agent.id, agent.role, deps.logger)
+      await updateAgentStatus(agent.id, finalTask.status_state === 'TASK_STATE_FAILED' ? 'failed' : 'idle')
+    } else {
+      // Reviewer: emit review_comment with the actual reviewer message text.
+      if (agent.role === 'reviewer') {
+        await emitReviewComment(taskId, task.context_id, agent.id, lastReviewerMessageText, deps.logger)
+      }
+      await emitAgentCompleted(taskId, task.context_id, agent.id, agent.role, deps.logger)
+      await updateAgentStatus(agent.id, 'idle')
+    }
   } catch (error) {
     deps.logger.error('Agent task failed', { taskId, error: error instanceof Error ? error.message : String(error) })
     await setTaskStatus(taskId, 'TASK_STATE_FAILED', statusMessage('처리 중 오류가 발생했습니다.'))
     await enqueuePushForTask(taskId).catch(() => undefined)
-    // Emit collaboration-progress engineering events: agent failed.
     await emitAgentFailed(taskId, task.context_id, agent.id, agent.role, deps.logger)
-      .catch(() => undefined)
     await updateAgentStatus(agent.id, 'failed').catch(() => undefined)
     throw error
   } finally {

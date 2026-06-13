@@ -18,12 +18,16 @@
 import type { Logger } from '../utils/logger.js'
 import type { AgentRole } from '../types/contracts.js'
 import { appendEvent } from '../db/repositories/a2aRepository.js'
-import { parseEngineeringEvent } from '../a2a/engineeringEvents.js'
-
+import { parseEngineeringEvent, type EngineeringEvent } from '../a2a/engineeringEvents.js'
 
 // ---------- Role → pipeline stage map ----------
 
-type PipelineStage = 'planning' | 'implementation' | 'review'
+/**
+ * Derived from the canonical zod vocabulary: a stage literal that is not in
+ * PipelineStageSchema's enum fails the BUILD here, instead of failing zod
+ * validation at runtime and silently skipping the emit.
+ */
+type PipelineStage = Extract<EngineeringEvent, { kind: 'pipeline_stage' }>['stage']
 
 const ROLE_STAGE: Record<AgentRole, PipelineStage> = {
   orchestrator: 'planning',
@@ -34,6 +38,7 @@ const ROLE_STAGE: Record<AgentRole, PipelineStage> = {
 }
 
 export function roleToStage(role: AgentRole): PipelineStage {
+  // `??` covers roles read from the DB that predate this map.
   return ROLE_STAGE[role] ?? 'planning'
 }
 
@@ -49,8 +54,10 @@ const ROLE_CURRENT_ACTION: Record<AgentRole, string> = {
 // ---------- Core helper ----------
 
 /**
- * Validate + persist one engineering event.  Never throws out of the worker:
- * any error is logged and swallowed.
+ * Validate + persist one engineering event.  Truly never throws: validation
+ * failures AND database errors are logged and swallowed here, so callers
+ * (the worker hot path) never need their own catch — progress telemetry must
+ * never break the task lifecycle.
  */
 async function appendEngineeringEvent(
   taskId: string,
@@ -63,29 +70,56 @@ async function appendEngineeringEvent(
     logger?.warn('collabEvents: event failed validation, skipping', { taskId, kind: event['kind'] })
     return
   }
-  await appendEvent({
-    taskId,
-    contextId,
-    eventType: parsed.kind,
-    payload: event,
-    visibleToUser: true
-  })
+  try {
+    await appendEvent({
+      taskId,
+      contextId,
+      eventType: parsed.kind,
+      payload: event,
+      visibleToUser: true
+    })
+  } catch (err) {
+    logger?.warn('collabEvents: failed to persist engineering event', {
+      taskId,
+      kind: parsed.kind,
+      error: String(err)
+    })
+  }
 }
 
-// ---------- Public emitters ----------
+// ---------- Lifecycle emitters ----------
+
+type LifecyclePhase = 'started' | 'completed' | 'failed'
+
+const LIFECYCLE: Record<
+  LifecyclePhase,
+  { agentStatus: string; stageStatus: 'active' | 'done' | 'failed'; timeKey: 'startedAt' | 'endedAt' }
+> = {
+  started: { agentStatus: 'working', stageStatus: 'active', timeKey: 'startedAt' },
+  completed: { agentStatus: 'done', stageStatus: 'done', timeKey: 'endedAt' },
+  failed: { agentStatus: 'failed', stageStatus: 'failed', timeKey: 'endedAt' }
+}
+
+function lifecycleAction(phase: LifecyclePhase, role: AgentRole): string {
+  if (phase === 'started') return ROLE_CURRENT_ACTION[role] ?? '작업 중입니다.'
+  return phase === 'completed' ? '작업 완료.' : '오류 발생.'
+}
 
 /**
- * Emit agent_status(working) + pipeline_stage(active) at task start.
+ * Emit the agent_status + pipeline_stage pair for one lifecycle phase.
+ * The two appends stay sequential on purpose: the pair lands in
+ * deterministic seq order for the timeline.
  */
-export async function emitAgentStarted(
+async function emitLifecycle(
+  phase: LifecyclePhase,
   taskId: string,
   contextId: string,
   agentId: string,
   role: AgentRole,
   logger?: Logger
 ): Promise<void> {
+  const { agentStatus, stageStatus, timeKey } = LIFECYCLE[phase]
   const timestamp = new Date().toISOString()
-  const stage = roleToStage(role)
 
   await appendEngineeringEvent(
     taskId,
@@ -94,12 +128,12 @@ export async function emitAgentStarted(
       kind: 'agent_status',
       agentId,
       role,
-      status: 'working',
-      currentAction: ROLE_CURRENT_ACTION[role] ?? '작업 중입니다.',
+      status: agentStatus,
+      currentAction: lifecycleAction(phase, role),
       timestamp
     },
     logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentStarted agent_status failed', { taskId, error: String(err) }))
+  )
 
   await appendEngineeringEvent(
     taskId,
@@ -107,102 +141,51 @@ export async function emitAgentStarted(
     {
       kind: 'pipeline_stage',
       agentId,
-      stage,
-      status: 'active',
-      startedAt: timestamp,
+      stage: roleToStage(role),
+      status: stageStatus,
+      [timeKey]: timestamp,
       timestamp
     },
     logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentStarted pipeline_stage failed', { taskId, error: String(err) }))
+  )
 }
 
-/**
- * Emit agent_status(done) + pipeline_stage(done) on successful completion.
- */
-export async function emitAgentCompleted(
+/** Emit agent_status(working) + pipeline_stage(active) at task start. */
+export function emitAgentStarted(
   taskId: string,
   contextId: string,
   agentId: string,
   role: AgentRole,
   logger?: Logger
 ): Promise<void> {
-  const timestamp = new Date().toISOString()
-  const stage = roleToStage(role)
-
-  await appendEngineeringEvent(
-    taskId,
-    contextId,
-    {
-      kind: 'agent_status',
-      agentId,
-      role,
-      status: 'done',
-      currentAction: '작업 완료.',
-      timestamp
-    },
-    logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentCompleted agent_status failed', { taskId, error: String(err) }))
-
-  await appendEngineeringEvent(
-    taskId,
-    contextId,
-    {
-      kind: 'pipeline_stage',
-      agentId,
-      stage,
-      status: 'done',
-      endedAt: timestamp,
-      timestamp
-    },
-    logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentCompleted pipeline_stage failed', { taskId, error: String(err) }))
+  return emitLifecycle('started', taskId, contextId, agentId, role, logger)
 }
 
-/**
- * Emit agent_status(failed) + pipeline_stage(failed) on task failure.
- */
-export async function emitAgentFailed(
+/** Emit agent_status(done) + pipeline_stage(done) on successful completion. */
+export function emitAgentCompleted(
   taskId: string,
   contextId: string,
   agentId: string,
   role: AgentRole,
   logger?: Logger
 ): Promise<void> {
-  const timestamp = new Date().toISOString()
-  const stage = roleToStage(role)
+  return emitLifecycle('completed', taskId, contextId, agentId, role, logger)
+}
 
-  await appendEngineeringEvent(
-    taskId,
-    contextId,
-    {
-      kind: 'agent_status',
-      agentId,
-      role,
-      status: 'failed',
-      currentAction: '오류 발생.',
-      timestamp
-    },
-    logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentFailed agent_status failed', { taskId, error: String(err) }))
-
-  await appendEngineeringEvent(
-    taskId,
-    contextId,
-    {
-      kind: 'pipeline_stage',
-      agentId,
-      stage,
-      status: 'failed',
-      endedAt: timestamp,
-      timestamp
-    },
-    logger
-  ).catch((err) => logger?.warn('collabEvents: emitAgentFailed pipeline_stage failed', { taskId, error: String(err) }))
+/** Emit agent_status(failed) + pipeline_stage(failed) on failure/cancellation. */
+export function emitAgentFailed(
+  taskId: string,
+  contextId: string,
+  agentId: string,
+  role: AgentRole,
+  logger?: Logger
+): Promise<void> {
+  return emitLifecycle('failed', taskId, contextId, agentId, role, logger)
 }
 
 /**
  * Emit a review_comment event with the reviewer's actual output text.
- * Only called when role === 'reviewer'.
+ * Only called when role === 'reviewer' and the task completed.
  * path/line are absent — this slice has no file context.
  */
 export async function emitReviewComment(
@@ -227,5 +210,5 @@ export async function emitReviewComment(
       timestamp
     },
     logger
-  ).catch((err) => logger?.warn('collabEvents: emitReviewComment failed', { taskId, error: String(err) }))
+  )
 }

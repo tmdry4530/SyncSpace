@@ -123,6 +123,14 @@ export function streamResponseEventName(response: StreamResponse): string {
   if ('task' in response) return 'message'
   if ('message' in response) return 'message'
   if ('statusUpdate' in response) return 'statusUpdate'
+  if ('artifactUpdate' in response) return 'artifactUpdate'
   if ('engineeringEvent' in response) return 'engineeringEvent'
-  return 'artifactUpdate'
+  // Exhaustiveness check: adding a StreamResponse variant without naming it
+  // here fails the BUILD, instead of silently streaming under a wrong
+  // catch-all event name (this bit us once with engineeringEvent already).
+  return assertNeverStreamResponse(response)
+}
+
+function assertNeverStreamResponse(value: never): never {
+  throw new Error(`Unhandled StreamResponse variant: ${JSON.stringify(value)}`)
 }

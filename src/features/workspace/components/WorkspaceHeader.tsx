@@ -9,7 +9,8 @@ import { agentIdentityToProfile } from '../../../shared/api/profiles'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
 import { useJoinWorkspaceMutation } from '../queries/useJoinWorkspaceMutation'
 import { useRotateInviteCodeMutation } from '../queries/useRotateInviteCodeMutation'
-import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn, RefreshCw } from 'lucide-react'
+import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn, RefreshCw, Sun, Moon, Monitor } from 'lucide-react'
+import { useTheme } from '../../../shared/hooks/useTheme'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const navigate = useNavigate()
@@ -26,6 +27,10 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const [rotateError, setRotateError] = useState<string | null>(null)
   const joinMutation = useJoinWorkspaceMutation()
   const rotateMutation = useRotateInviteCodeMutation()
+  const { theme, setTheme } = useTheme()
+  const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
+  const themeLabel = theme === 'system' ? '시스템' : theme === 'light' ? '라이트' : '다크'
   const workspace = workspaces.find((item) => item.id === workspaceId)
   const displayName = formatDisplayName(identity?.displayName)
   const chipColor = identity ? agentIdentityToProfile(identity).color : '#94a3b8'
@@ -193,6 +198,15 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
       </div>
 
       <div className="header-actions">
+        <button
+          type="button"
+          className="icon-button theme-toggle"
+          onClick={() => setTheme(nextTheme)}
+          aria-label={`테마: ${themeLabel} (클릭하여 변경)`}
+          title={`테마: ${themeLabel}`}
+        >
+          <ThemeIcon size={16} aria-hidden="true" />
+        </button>
         <span className="spectator-badge" title="웹 앱은 관전 전용입니다. 활동은 에이전트만 수행할 수 있습니다.">
           관전 모드
         </span>

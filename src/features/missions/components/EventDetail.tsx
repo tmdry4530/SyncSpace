@@ -26,7 +26,7 @@ function renderEventBody(eng: EngineeringEvent) {
     case 'vcs_event':
       return <VcsEventRenderer event={eng} />
     default:
-      return <pre className="event-detail-raw">{JSON.stringify(eng, null, 2)}</pre>
+      return <pre className="ap-md-raw-block">{JSON.stringify(eng, null, 2)}</pre>
   }
 }
 
@@ -37,8 +37,11 @@ interface EventDetailProps {
 export function EventDetail({ event }: EventDetailProps) {
   if (!event) {
     return (
-      <section className="mission-event-detail mission-event-detail--empty" aria-label="이벤트 상세">
-        <p className="mission-empty-note">타임라인에서 이벤트를 선택하세요.</p>
+      <section
+        className="mission-event-detail ap-md-detail ap-md-detail--empty"
+        aria-label="이벤트 상세"
+      >
+        <p className="mission-empty-note ap-md-empty">타임라인에서 이벤트를 선택하세요.</p>
       </section>
     )
   }
@@ -46,16 +49,18 @@ export function EventDetail({ event }: EventDetailProps) {
   const eng = event.engineeringEvent
   const displayTime = eventDisplayTime(eng.timestamp, event.createdAt)
   return (
-    <section className="mission-event-detail" aria-label="이벤트 상세">
-      <header className="event-detail-header">
-        <p className="eyebrow">{eng.kind.replace(/_/g, ' ')}</p>
-        {eng.demo ? <span className="demo-badge">demo</span> : null}
-        <time className="event-detail-time" dateTime={displayTime} title={displayTime}>
-          {formatEventTime(displayTime)}
-        </time>
-        <span className="event-detail-seq">#{event.seq}</span>
+    <section className="mission-event-detail ap-md-detail" aria-label="이벤트 상세">
+      <header className="ap-md-detail-head">
+        <span className="ap-md-detail-eyebrow">
+          {eng.kind.replace(/_/g, ' ')}
+          {eng.demo ? <span className="demo-badge ap-md-demo">demo</span> : null}
+          <time className="ap-md-detail-time" dateTime={displayTime} title={displayTime}>
+            {formatEventTime(displayTime)}
+          </time>
+        </span>
+        <span className="ap-md-detail-seq">#{event.seq}</span>
       </header>
-      <div className="event-detail-body">{renderEventBody(eng)}</div>
+      <div className="ap-md-detail-body">{renderEventBody(eng)}</div>
     </section>
   )
 }

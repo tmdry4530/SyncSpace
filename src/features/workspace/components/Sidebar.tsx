@@ -20,44 +20,57 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
   const toggleCollapsed = useSidebarStore((state) => state.toggleCollapsed)
 
   return (
-    <aside className={isCollapsed ? 'sidebar collapsed' : 'sidebar'}>
-      <div className="sidebar-brand">
-        <Link className="brand-lockup" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
-          <span className="brand-icon" aria-hidden="true">S</span>
-          <span className="brand-wordmark">SyncSpace</span>
+    <aside className="ap-shell-rail">
+      <div className="ap-shell-rail-brand">
+        <Link className="ap-shell-brand-lockup" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
+          <span className="ap-shell-brand-icon" aria-hidden="true">S</span>
+          <span className="ap-shell-brand-wordmark">SyncSpace</span>
         </Link>
         {onMobileClose ? (
-          <button className="mobile-sidebar-close" onClick={onMobileClose} type="button" aria-label="사이드바 닫기">
-            <X size={18} />
+          <button className="ap-shell-mobile-close" onClick={onMobileClose} type="button" aria-label="사이드바 닫기">
+            <X size={18} aria-hidden="true" />
             닫기
           </button>
         ) : null}
-        <button className="collapse-button" onClick={toggleCollapsed} type="button" aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}>
-          {isCollapsed ? <PanelLeftOpen size={18} /> : <ChevronLeft size={18} />}
-          <span>{isCollapsed ? '펼치기' : '접기'}</span>
+        <button
+          className="ap-shell-collapse-btn"
+          onClick={toggleCollapsed}
+          type="button"
+          aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+        >
+          {isCollapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <ChevronLeft size={18} aria-hidden="true" />}
+          <span className="ap-shell-collapse-label">{isCollapsed ? '펼치기' : '접기'}</span>
         </button>
       </div>
-      <div className="sidebar-content">
-        <div className="sidebar-section sidebar-home">
-          <Link aria-label="워크스페이스 홈" className="sidebar-workspace-link" title="워크스페이스" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
-            <LayoutGrid aria-hidden="true" size={16} />
+      <div className="ap-shell-rail-body">
+        <div className="ap-shell-nav-primary">
+          <Link
+            aria-label="워크스페이스 홈"
+            className="ap-shell-nav-link"
+            title="워크스페이스"
+            to={routes.workspace(workspaceId)}
+            onClick={onMobileClose}
+          >
+            <LayoutGrid aria-hidden="true" size={17} />
             <span className="nav-label">워크스페이스</span>
           </Link>
-          <Link aria-label="미션 목록" className="sidebar-workspace-link sidebar-missions-link" title="미션" to={routes.missions(workspaceId)} onClick={onMobileClose}>
-            <ClipboardList aria-hidden="true" size={16} />
+          <Link
+            aria-label="미션 목록"
+            className="ap-shell-nav-link"
+            title="미션"
+            to={routes.missions(workspaceId)}
+            onClick={onMobileClose}
+          >
+            <ClipboardList aria-hidden="true" size={17} />
             <span className="nav-label">미션</span>
           </Link>
         </div>
-        <div className="sidebar-section sidebar-section--channels">
-          <div className="sidebar-section-header">
-            <p className="eyebrow">채널</p>
-          </div>
+        <div className="ap-shell-section">
+          <p className="ap-shell-section-label">채널</p>
           <ChannelList workspaceId={workspaceId} onNavigate={onMobileClose} />
         </div>
-        <div className="sidebar-section sidebar-section--documents">
-          <div className="sidebar-section-header">
-            <p className="eyebrow">문서</p>
-          </div>
+        <div className="ap-shell-section">
+          <p className="ap-shell-section-label">문서</p>
           <DocumentList workspaceId={workspaceId} onNavigate={onMobileClose} />
         </div>
       </div>

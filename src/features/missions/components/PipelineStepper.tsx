@@ -11,10 +11,10 @@ const STAGE_LABELS: Record<PipelineStage, string> = {
 }
 
 const STATUS_CLASS: Record<PipelineStageStatus, string> = {
-  pending: 'pipeline-stage--pending',
-  active: 'pipeline-stage--active',
-  done: 'pipeline-stage--done',
-  failed: 'pipeline-stage--failed'
+  pending: 'ap-md-stage--pending',
+  active: 'ap-md-stage--active',
+  done: 'ap-md-stage--done',
+  failed: 'ap-md-stage--failed'
 }
 
 // Status must be conveyed by text, not color alone (a11y: ~8% of users can't
@@ -39,24 +39,24 @@ export function PipelineStepper({ stages }: PipelineStepperProps) {
 
   return (
     <section className="mission-pipeline" aria-label="파이프라인 단계">
-      <p className="eyebrow">파이프라인</p>
+      <p className="eyebrow ap-md-eyebrow">파이프라인</p>
       {presentStages.length === 0 ? (
-        <p className="pipeline-stage-empty">아직 단계 없음</p>
+        <p className="pipeline-stage-empty ap-md-empty">아직 단계 없음</p>
       ) : (
-        <ol className="pipeline-stage-list">
+        <ol className="ap-md-stage-list">
           {presentStages.map((stage, idx) => {
             const ev = stages.get(stage)
             const status: PipelineStageStatus = ev?.status ?? 'pending'
             return (
               <li
                 key={stage}
-                className={`pipeline-stage ${STATUS_CLASS[status]}`}
+                className={`ap-md-stage ${STATUS_CLASS[status]}`}
                 aria-label={`${STAGE_LABELS[stage]} — ${STATUS_LABELS[status]}`}
               >
-                <span className="pipeline-stage-index">{idx + 1}</span>
-                <span className="pipeline-stage-label">{STAGE_LABELS[stage]}</span>
-                <span className="pipeline-stage-status">{STATUS_LABELS[status]}</span>
-                {ev?.summary ? <span className="pipeline-stage-summary">{ev.summary}</span> : null}
+                <span className="ap-md-stage-index" aria-hidden="true">{idx + 1}</span>
+                <span className="ap-md-stage-label">{STAGE_LABELS[stage]}</span>
+                <span className="ap-md-stage-status">{STATUS_LABELS[status]}</span>
+                {ev?.summary ? <span className="ap-md-stage-summary">{ev.summary}</span> : null}
               </li>
             )
           })}

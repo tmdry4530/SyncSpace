@@ -1,0 +1,327 @@
+/* ============================================================
+   Apple-style standalone pages — API Contract + 404 / states
+   Shared by ContractPage.tsx and NotFoundPage.tsx.
+   All colors via global tokens so light + dark both work.
+   Prefix: ap-pg-
+   ============================================================ */
+
+/* ---- shared page shell (centered on tinted canvas) ---- */
+.ap-pg-shell {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: clamp(28px, 6vw, 72px) clamp(16px, 5vw, 56px);
+  box-sizing: border-box;
+}
+
+.ap-pg-shell--center {
+  align-items: center;
+}
+
+/* ============================================================
+   API CONTRACT — bright reference document
+   ============================================================ */
+
+/* outer framed surface (the f5f5f7 frame around the white doc) */
+.ap-pg-contract-frame {
+  width: 100%;
+  max-width: 920px;
+  background: var(--surface-low);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: clamp(20px, 4vw, 40px) clamp(16px, 3vw, 28px);
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* inner white document card */
+.ap-pg-contract-doc {
+  width: 100%;
+  max-width: 820px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: clamp(28px, 5vw, 40px) clamp(20px, 5vw, 44px);
+  box-sizing: border-box;
+}
+
+/* brand mark sits above the eyebrow */
+.ap-pg-brand {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+.ap-pg-brand:hover { color: var(--accent); }
+
+.ap-pg-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 14px;
+}
+
+.ap-pg-doc-title {
+  font-family: var(--font-display);
+  font-size: clamp(30px, 6vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+.ap-pg-doc-lede {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 32px;
+  max-width: 60ch;
+}
+
+/* each thematic block, divided by a top rule */
+.ap-pg-section {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-bottom: 24px;
+}
+.ap-pg-section:last-of-type { margin-bottom: 30px; }
+
+.ap-pg-section-title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+/* principle bullet rows */
+.ap-pg-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ap-pg-bullet {
+  display: flex;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.ap-pg-bullet::before {
+  content: '\2022';
+  color: var(--accent);
+  flex: none;
+}
+.ap-pg-bullet strong { font-weight: 600; }
+.ap-pg-bullet .ap-pg-bullet-note { color: var(--muted); }
+
+/* supabase tables grid */
+.ap-pg-table-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ap-pg-table-card {
+  background: var(--surface-low);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  min-width: 0;
+}
+.ap-pg-table-card code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  overflow-wrap: anywhere;
+}
+.ap-pg-table-card span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* realtime endpoints — label + mono value rows */
+.ap-pg-endpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ap-pg-endpoint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 15px;
+}
+.ap-pg-endpoint strong {
+  font-weight: 600;
+  color: var(--text);
+  flex: none;
+}
+.ap-pg-endpoint code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--muted-strong);
+  background: var(--surface-low);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 8px;
+  overflow-wrap: anywhere;
+}
+
+/* error-shape terminal block — stays dark in both themes */
+.ap-pg-code {
+  background: #0a0e14;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e6e8eb;
+  overflow-x: auto;
+}
+.ap-pg-code .ap-pg-code-kw { color: #5eead4; }
+
+/* primary/ghost pill CTAs */
+.ap-pg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ap-pg-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 980px;
+  padding: 11px 22px;
+  font-size: 16px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .15s ease, background .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+.ap-pg-pill--primary {
+  background: var(--accent);
+  color: var(--accent-on, #fff);
+  border: 1px solid var(--accent);
+}
+.ap-pg-pill--primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+  border-color: color-mix(in srgb, var(--accent) 88%, #000);
+  transform: translateY(-1px);
+}
+.ap-pg-pill--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+.ap-pg-pill--ghost:hover {
+  background: var(--surface-low);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   STATE CARDS — 404 / empty / error fallbacks
+   ============================================================ */
+.ap-pg-state-card {
+  width: 100%;
+  max-width: 520px;
+  min-height: 340px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: clamp(28px, 6vw, 48px) clamp(20px, 5vw, 40px);
+  box-sizing: border-box;
+}
+
+.ap-pg-state-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ap-pg-state-code {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 14vw, 72px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0 0 18px;
+  color: var(--text);
+}
+
+.ap-pg-state-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.ap-pg-state-copy {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 22px;
+  max-width: 34ch;
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 640px) {
+  .ap-pg-table-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ap-pg-doc-lede { font-size: 16px; }
+}
+
+@media (max-width: 420px) {
+  .ap-pg-table-grid {
+    grid-template-columns: 1fr;
+  }
+  .ap-pg-actions { width: 100%; }
+  .ap-pg-pill { flex: 1 1 auto; }
+}
+
+/* coarse pointer — guarantee 44px tap targets */
+@media (pointer: coarse) {
+  .ap-pg-pill { min-height: 44px; }
+}
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ap-pg-pill { transition: none; }
+  .ap-pg-pill:hover { transform: none; }
+}

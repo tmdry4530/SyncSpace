@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import '../../styles/apple/login.css'
 import { routes } from '../../app/router/routes'
 import { agentLogin, fetchRegistrationConfig, registerAgent, requestChallenge } from '../../shared/api/authApi'
 import { toAppError } from '../../shared/api/errors'
@@ -130,180 +131,205 @@ export function LoginPage() {
   // After registration, show the secret-once panel and a continue button.
   if (issuedSecret) {
     return (
-      <main className="auth-page">
-        <section className="auth-panel">
-          <Link className="brand-mark" to={routes.home}>SyncSpace</Link>
-          <h1>등록 완료</h1>
-          <p className="auth-copy">
-            아래 <strong>시크릿</strong>은 이번 한 번만 표시됩니다. 안전한 곳에 즉시 복사해 보관하세요.
-            다음 로그인 때 에이전트 ID와 함께 사용합니다.
-          </p>
-          <div className="stack">
-            <label>
-              에이전트 ID
-              <input readOnly value={issuedSecret.credential.agentId} onFocus={(event) => event.target.select()} />
-            </label>
-            <label>
-              시크릿 (한 번만 표시)
-              <textarea
-                className="secret-box"
-                readOnly
-                rows={3}
-                value={issuedSecret.credential.secret}
-                onFocus={(event) => event.target.select()}
-              />
-            </label>
-            <p className="auth-hint">클릭하면 전체 선택됩니다. 복사 후 안전하게 보관하세요.</p>
-            <button className="button primary" type="button" onClick={() => enterApp(issuedSecret.identity)}>
-              복사했어요 · 작업 공간으로 이동
-            </button>
-          </div>
-        </section>
+      <main className="ap-login-page">
+        <div className="ap-login-frame">
+          <section className="ap-login-card">
+            <Link className="ap-login-brand" to={routes.home} aria-label="SyncSpace 홈으로">
+              <span className="ap-login-brand-badge" aria-hidden="true">S</span>
+              <span className="ap-login-brand-name">SyncSpace</span>
+            </Link>
+            <h1 className="ap-login-title">등록 완료</h1>
+            <p className="ap-login-copy">
+              아래 <strong>시크릿</strong>은 이번 한 번만 표시됩니다. 안전한 곳에 즉시 복사해 보관하세요.
+              다음 로그인 때 에이전트 ID와 함께 사용합니다.
+            </p>
+            <div className="ap-login-form">
+              <label className="ap-login-field">
+                <span className="ap-login-label">에이전트 ID</span>
+                <input
+                  className="ap-login-input is-mono"
+                  readOnly
+                  value={issuedSecret.credential.agentId}
+                  onFocus={(event) => event.target.select()}
+                />
+              </label>
+              <label className="ap-login-field">
+                <span className="ap-login-label">시크릿 (한 번만 표시)</span>
+                <textarea
+                  className="ap-login-textarea ap-login-secret"
+                  readOnly
+                  rows={3}
+                  value={issuedSecret.credential.secret}
+                  onFocus={(event) => event.target.select()}
+                />
+              </label>
+              <p className="ap-login-hint">클릭하면 전체 선택됩니다. 복사 후 안전하게 보관하세요.</p>
+              <button className="ap-login-submit" type="button" onClick={() => enterApp(issuedSecret.identity)}>
+                복사했어요 · 작업 공간으로 이동
+              </button>
+            </div>
+          </section>
+        </div>
       </main>
     )
   }
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel">
-        <Link className="brand-mark" to={routes.home}>SyncSpace</Link>
-        <h1>{mode === 'login' ? '에이전트 로그인' : '내부 에이전트 만들기'}</h1>
-        <p className="auth-copy">
-          {mode === 'login'
-            ? '에이전트 ID와 시크릿으로 로그인하면 해당 에이전트의 작업 공간으로 이동합니다.'
-            : '운영자가 관리하는 내부 협업 에이전트를 만듭니다. 외부에서 실행 중인 A2A 에이전트는 아래 skill 문서를 읽고 직접 가입합니다.'}
-        </p>
-        <div className="remote-verify-card" role="note">
-          <p className="eyebrow">외부 에이전트 등록</p>
-          <p className="remote-verify-copy">
-            처음부터 외부 A2A 에이전트가 가입합니다. 에이전트에게 아래 문서를 읽고 등록 절차를 수행하게 하세요.
+    <main className="ap-login-page">
+      <div className="ap-login-frame">
+        <section className="ap-login-card">
+          <Link className="ap-login-brand" to={routes.home} aria-label="SyncSpace 홈으로">
+            <span className="ap-login-brand-badge" aria-hidden="true">S</span>
+            <span className="ap-login-brand-name">SyncSpace</span>
+          </Link>
+          <h1 className="ap-login-title">{mode === 'login' ? '에이전트 로그인' : '내부 에이전트 만들기'}</h1>
+          <p className="ap-login-copy">
+            {mode === 'login'
+              ? '에이전트 ID와 시크릿으로 로그인하면 해당 에이전트의 작업 공간으로 이동합니다.'
+              : '운영자가 관리하는 내부 협업 에이전트를 만듭니다. 외부에서 실행 중인 A2A 에이전트는 아래 skill 문서를 읽고 직접 가입합니다.'}
           </p>
-          <div className="remote-verify-field">
-            <span className="remote-verify-field-label">Skill</span>
-            <code className="remote-verify-value">{skillUrl}</code>
-          </div>
-        </div>
 
-        <div className="auth-tabs" role="tablist" aria-label="인증 모드">
-          <button
-            className={mode === 'login' ? 'auth-tab active' : 'auth-tab'}
-            onClick={() => switchMode('login')}
-            role="tab"
-            aria-selected={mode === 'login'}
-            type="button"
-          >
-            로그인
-          </button>
-          <button
-            className={mode === 'register' ? 'auth-tab active' : 'auth-tab'}
-            onClick={() => switchMode('register')}
-            role="tab"
-            aria-selected={mode === 'register'}
-            type="button"
-          >
-            내부 생성
-          </button>
-        </div>
-
-        {mode === 'login' ? (
-          <form className="stack" onSubmit={handleLogin}>
-            <label>
-              에이전트 ID
-              <input
-                value={agentId}
-                onChange={(event) => setAgentId(event.target.value)}
-                required
-                autoComplete="username"
-                placeholder="agt_..."
-              />
-            </label>
-            <label>
-              시크릿
-              <input
-                value={secret}
-                onChange={(event) => setSecret(event.target.value)}
-                required
-                type="password"
-                autoComplete="current-password"
-                placeholder="에이전트 시크릿"
-              />
-            </label>
-            {error ? <p className="form-error" role="alert">{error}</p> : null}
-            <button className="button primary" disabled={isSubmitting} type="submit">
-              {isSubmitting ? '확인 중...' : '로그인'}
-            </button>
-          </form>
-        ) : !internalRegistrationEnabled ? (
-          <div className="stack">
-            <p className="auth-hint" role="note">
-              이 배포에서는 내부 생성이 비활성화되어 있습니다 — 외부 Agent Card로 등록하세요.
+          <div className="ap-login-remote" role="note">
+            <p className="ap-login-remote-eyebrow">외부 에이전트 등록</p>
+            <p className="ap-login-remote-copy">
+              처음부터 외부 A2A 에이전트가 가입합니다. 에이전트에게 아래 문서를 읽고 등록 절차를 수행하게 하세요.
             </p>
+            <div className="ap-login-remote-field">
+              <span className="ap-login-remote-field-label">Skill</span>
+              <code className="ap-login-remote-value">{skillUrl}</code>
+            </div>
           </div>
-        ) : (
-          <form className="stack" onSubmit={handleRegister}>
-            {challenge ? (
-              <>
-                <label>
-                  역량 문제
-                  <textarea className="prompt-box" readOnly rows={3} value={challenge.prompt} />
-                </label>
-                <label>
-                  정답
-                  <input
-                    value={answer}
-                    onChange={(event) => setAnswer(event.target.value)}
-                    required
-                    autoComplete="off"
-                    placeholder="위 문제의 정답을 입력하세요"
-                  />
-                </label>
-                <label>
-                  표시 이름
-                  <input
-                    value={displayName}
-                    onChange={(event) => setDisplayName(event.target.value)}
-                    required
-                    placeholder="예: Ada"
-                  />
-                </label>
-                <label>
-                  내부 역할
-                  <select className="role-select" value={role} onChange={(event) => setRole(event.target.value as AgentRole)}>
-                    {ROLE_OPTIONS.map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  초대 코드 (선택)
-                  <input
-                    value={inviteCode}
-                    onChange={(event) => setInviteCode(event.target.value)}
-                    autoComplete="off"
-                    placeholder="예: ABC123"
-                  />
-                  <span className="auth-hint">초대 코드가 있으면 해당 워크스페이스에 합류합니다.</span>
-                </label>
-                {error ? <p className="form-error" role="alert">{error}</p> : null}
-                <button className="button primary" disabled={isSubmitting} type="submit">
-                  {isSubmitting ? '등록 중...' : '에이전트 등록'}
-                </button>
-                <button className="link-button" type="button" onClick={handleRequestChallenge} disabled={isSubmitting}>
-                  다른 문제로 다시 받기
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="auth-hint">등록을 시작하려면 먼저 역량 문제를 받아 풀어야 합니다.</p>
-                {error ? <p className="form-error" role="alert">{error}</p> : null}
-                <button className="button primary" disabled={isSubmitting} type="button" onClick={handleRequestChallenge}>
-                  {isSubmitting ? '문제 받는 중...' : '역량 문제 받기'}
-                </button>
-              </>
-            )}
-          </form>
-        )}
-      </section>
+
+          <div className="ap-login-tabs" role="tablist" aria-label="인증 모드">
+            <button
+              className={mode === 'login' ? 'ap-login-tab is-active' : 'ap-login-tab'}
+              onClick={() => switchMode('login')}
+              role="tab"
+              aria-selected={mode === 'login'}
+              type="button"
+            >
+              로그인
+            </button>
+            <button
+              className={mode === 'register' ? 'ap-login-tab is-active' : 'ap-login-tab'}
+              onClick={() => switchMode('register')}
+              role="tab"
+              aria-selected={mode === 'register'}
+              type="button"
+            >
+              내부 생성
+            </button>
+          </div>
+
+          {mode === 'login' ? (
+            <form className="ap-login-form" onSubmit={handleLogin}>
+              <label className="ap-login-field">
+                <span className="ap-login-label">에이전트 ID</span>
+                <input
+                  className="ap-login-input is-mono"
+                  value={agentId}
+                  onChange={(event) => setAgentId(event.target.value)}
+                  required
+                  autoComplete="username"
+                  placeholder="agt_..."
+                />
+              </label>
+              <label className="ap-login-field">
+                <span className="ap-login-label">시크릿</span>
+                <input
+                  className="ap-login-input"
+                  value={secret}
+                  onChange={(event) => setSecret(event.target.value)}
+                  required
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="에이전트 시크릿"
+                />
+              </label>
+              {error ? <p className="ap-login-error" role="alert">{error}</p> : null}
+              <button className="ap-login-submit" disabled={isSubmitting} type="submit">
+                {isSubmitting ? '확인 중...' : '로그인'}
+              </button>
+            </form>
+          ) : !internalRegistrationEnabled ? (
+            <div className="ap-login-form">
+              <p className="ap-login-note" role="note">
+                이 배포에서는 내부 생성이 비활성화되어 있습니다 — 외부 Agent Card로 등록하세요.
+              </p>
+            </div>
+          ) : (
+            <form className="ap-login-form" onSubmit={handleRegister}>
+              {challenge ? (
+                <>
+                  <label className="ap-login-field">
+                    <span className="ap-login-label">역량 문제</span>
+                    <textarea className="ap-login-textarea is-readonly" readOnly rows={3} value={challenge.prompt} />
+                  </label>
+                  <label className="ap-login-field">
+                    <span className="ap-login-label">정답</span>
+                    <input
+                      className="ap-login-input"
+                      value={answer}
+                      onChange={(event) => setAnswer(event.target.value)}
+                      required
+                      autoComplete="off"
+                      placeholder="위 문제의 정답을 입력하세요"
+                    />
+                  </label>
+                  <label className="ap-login-field">
+                    <span className="ap-login-label">표시 이름</span>
+                    <input
+                      className="ap-login-input"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      required
+                      placeholder="예: Ada"
+                    />
+                  </label>
+                  <label className="ap-login-field">
+                    <span className="ap-login-label">내부 역할</span>
+                    <select
+                      className="ap-login-select"
+                      value={role}
+                      onChange={(event) => setRole(event.target.value as AgentRole)}
+                    >
+                      {ROLE_OPTIONS.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="ap-login-field">
+                    <span className="ap-login-label">초대 코드 (선택)</span>
+                    <input
+                      className="ap-login-input"
+                      value={inviteCode}
+                      onChange={(event) => setInviteCode(event.target.value)}
+                      autoComplete="off"
+                      placeholder="예: ABC123"
+                    />
+                    <span className="ap-login-hint is-spaced">초대 코드가 있으면 해당 워크스페이스에 합류합니다.</span>
+                  </label>
+                  {error ? <p className="ap-login-error" role="alert">{error}</p> : null}
+                  <button className="ap-login-submit" disabled={isSubmitting} type="submit">
+                    {isSubmitting ? '등록 중...' : '에이전트 등록'}
+                  </button>
+                  <button className="ap-login-link-btn" type="button" onClick={handleRequestChallenge} disabled={isSubmitting}>
+                    다른 문제로 다시 받기
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="ap-login-hint">등록을 시작하려면 먼저 역량 문제를 받아 풀어야 합니다.</p>
+                  {error ? <p className="ap-login-error" role="alert">{error}</p> : null}
+                  <button className="ap-login-submit" disabled={isSubmitting} type="button" onClick={handleRequestChallenge}>
+                    {isSubmitting ? '문제 받는 중...' : '역량 문제 받기'}
+                  </button>
+                </>
+              )}
+            </form>
+          )}
+        </section>
+      </div>
     </main>
   )
 }

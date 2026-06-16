@@ -29,28 +29,30 @@ export function VcsEventRenderer({ event }: Props) {
 
   return (
     <div className="renderer-vcs-event">
-      <div className="vcs-row">
-        <span className="vcs-action-icon" aria-hidden="true">
-          {ACTION_ICON[event.action]}
-        </span>
-        <span className="vcs-action-label">{ACTION_LABEL[event.action]}</span>
-        {event.branch && <span className="vcs-branch">{event.branch}</span>}
-        {shortSha && (
-          <span className="vcs-sha" title={event.commitSha}>
-            {shortSha}
+      <div className="ap-md-card">
+        <div className="ap-md-vcs-row">
+          <span className="ap-md-vcs-icon" aria-hidden="true">
+            {ACTION_ICON[event.action]}
           </span>
-        )}
-        {prUrl && (
-          <a
-            className="vcs-pr-link"
-            href={prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            PR ↗
-          </a>
-        )}
-        {event.summary && <span className="vcs-summary">{event.summary}</span>}
+          <span className="ap-md-vcs-label">{ACTION_LABEL[event.action]}</span>
+          {event.branch && <span className="ap-md-vcs-branch">{event.branch}</span>}
+          {shortSha && (
+            <span className="ap-md-vcs-sha" title={event.commitSha}>
+              {shortSha}
+            </span>
+          )}
+          {prUrl && (
+            <a
+              className="ap-md-vcs-pr"
+              href={prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              PR ↗
+            </a>
+          )}
+          {event.summary && <span className="ap-md-vcs-summary">{event.summary}</span>}
+        </div>
       </div>
       <RawInspect event={event} />
     </div>

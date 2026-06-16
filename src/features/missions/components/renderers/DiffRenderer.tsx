@@ -28,25 +28,25 @@ export function DiffRenderer({ event }: Props) {
 
   return (
     <div className="renderer-file-edit">
-      <div className="diff-file-header">
-        <span className="diff-file-path">{event.path}</span>
-        <div className="diff-counts">
-          {additions > 0 && <span className="diff-count diff-count--add">+{additions}</span>}
-          {deletions > 0 && <span className="diff-count diff-count--del">-{deletions}</span>}
+      <div className="ap-md-diff-head">
+        <span className="ap-md-diff-path">{event.path}</span>
+        <div className="ap-md-diff-counts">
+          {additions > 0 && <span className="ap-md-diff-count--add">+{additions}</span>}
+          {deletions > 0 && <span className="ap-md-diff-count--del">−{deletions}</span>}
         </div>
       </div>
-      {event.summary && <p className="renderer-summary">{event.summary}</p>}
+      {event.summary && <p className="ap-md-summary">{event.summary}</p>}
       {lines.length === 0 ? (
-        <p className="renderer-empty">통합 diff 없음</p>
+        <p className="ap-md-empty">통합 diff 없음</p>
       ) : (
-        <div className="diff-view" role="region" aria-label="unified diff">
+        <div className="ap-md-diff-view" role="region" aria-label="unified diff">
           {lines.map((line, i) => (
             <div
               key={i}
-              className={`diff-line diff-line--${line.type}`}
+              className={`ap-md-diff-line ap-md-diff-line--${line.type}`}
               aria-hidden={line.type === 'blank'}
             >
-              <span className="diff-line-content">{line.content}</span>
+              {line.content}
             </div>
           ))}
         </div>

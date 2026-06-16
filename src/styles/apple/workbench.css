@@ -201,7 +201,8 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) var(--ap-wb-chat-w, 320px);
+  /* doc (fills) | resizer (auto, ~10px) | chat (fixed-ish, document-dominant per the mock) */
+  grid-template-columns: minmax(0, 1fr) auto var(--ap-wb-chat-w, 340px);
 }
 
 .ap-wb-pane {

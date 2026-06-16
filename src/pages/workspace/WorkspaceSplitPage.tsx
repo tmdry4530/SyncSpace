@@ -19,7 +19,7 @@ export function WorkspaceSplitPage() {
   const { data: channels = [], isLoading: channelsLoading } = useChannelsQuery(workspaceId)
   const { data: documents = [], isLoading: documentsLoading } = useDocumentsQuery(workspaceId)
   const [bannerDismissed, setBannerDismissed] = useState(() => readHelpDismissed())
-  const [chatWidth, setChatWidth] = useState(40)
+  const [chatPx, setChatPx] = useState(340)
   const [isDragging, setIsDragging] = useState(false)
   const [activeMobilePane, setActiveMobilePane] = useState<'chat' | 'document'>('chat')
 
@@ -59,8 +59,9 @@ export function WorkspaceSplitPage() {
       const container = document.querySelector('.split-workbench')
       if (!container) return
       const rect = container.getBoundingClientRect()
-      const newPercentage = ((event.clientX - rect.left) / rect.width) * 100
-      if (newPercentage > 24 && newPercentage < 68) setChatWidth(newPercentage)
+      // Chat lives in the right column; size it from the right edge.
+      const newWidth = rect.right - event.clientX
+      if (newWidth > 280 && newWidth < 560) setChatPx(newWidth)
     }
 
     const handleMouseUp = () => setIsDragging(false)
@@ -88,17 +89,16 @@ export function WorkspaceSplitPage() {
 
   const docTitle = selectedDocument?.title ?? '문서'
   const channelLabel = selectedChannel ? `#${selectedChannel.name}` : '채팅'
-  // The mock chat column sits on the right at 320px; the resizer adjusts chatWidth
-  // (a left-anchored percentage). Feed the inverse so the divider still tracks the drag.
-  const chatColWidth = `${Math.max(24, Math.min(56, 100 - chatWidth))}%`
+  // Chat column width in px (document-dominant per the mock); adjusted by the resizer.
+  const chatColWidth = `${chatPx}px`
 
   return (
     <section className="workspace-canvas ap-wb-canvas" aria-label="채팅과 문서 동시 협업 화면">
-      <div className="ap-wb-intro">
-        <p className="ap-wb-eyebrow">04 · 워크벤치</p>
-        <h2>문서 우위 · 타입 주도</h2>
-        {!bannerDismissed ? <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p> : null}
-      </div>
+      {!bannerDismissed ? (
+        <div className="ap-wb-intro">
+          <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p>
+        </div>
+      ) : null}
 
       <div className="ap-wb-frame">
         <div className="ap-wb-topbar">

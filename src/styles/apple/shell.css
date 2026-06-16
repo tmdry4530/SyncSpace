@@ -83,19 +83,14 @@
 .ap-shell-collapsed .ap-shell-brand-wordmark {
   display: none;
 }
-/* Collapsed: the logo IS the expand trigger (no separate open button). */
-.ap-shell-brand-expand {
-  background: transparent;
-  border: none;
+/* Collapsed: no separate open button — the logo itself expands the rail. */
+.ap-shell-collapsed .ap-shell-collapse-btn {
+  display: none;
+}
+.ap-shell-collapsed .ap-shell-brand-lockup {
   cursor: pointer;
-  padding: 0;
-  justify-content: center;
 }
-.ap-shell-brand-expand:hover {
-  transform: none;
-  box-shadow: none;
-}
-.ap-shell-brand-expand:hover .ap-shell-brand-icon {
+.ap-shell-collapsed .ap-shell-brand-lockup:hover .ap-shell-brand-icon {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
 }
 
@@ -878,6 +873,10 @@
     transform: translateX(-100%);
     transition: transform 0.28s cubic-bezier(0.2, 0.6, 0.25, 1);
     box-shadow: var(--shadow-overlay, 24px 0 60px rgba(0, 0, 0, 0.18));
+  }
+  /* The drawer uses the X close button, not the desktop collapse chevron. */
+  .ap-shell-collapse-btn {
+    display: none;
   }
   /* In the drawer, always show the expanded layout regardless of collapse */
   .ap-shell-collapsed .ap-shell-rail-brand {

@@ -23,22 +23,25 @@ export function AgentRoster({ roster, agents }: AgentRosterProps) {
 
   return (
     <section className="mission-roster" aria-label="에이전트 로스터">
-      <p className="eyebrow">에이전트</p>
+      <p className="eyebrow ap-md-eyebrow">에이전트</p>
       {statuses.length === 0 ? (
-        <p className="mission-empty-note">아직 에이전트 상태가 없습니다.</p>
+        <p className="mission-empty-note ap-md-empty">아직 에이전트 상태가 없습니다.</p>
       ) : (
-        <ul className="roster-list">
+        <ul className="ap-md-roster-list">
           {statuses.map((agent) => (
-            <li key={agent.agentId} className="roster-row">
-              <div className="roster-row-header">
-                <span className="roster-agent-id" title={agent.agentId}>
+            <li key={agent.agentId} className="ap-md-roster-card">
+              <div className="ap-md-roster-head">
+                <span className="ap-md-roster-name" title={agent.agentId}>
                   {displayName(agent.agentId, profileById.get(agent.agentId))}
                 </span>
-                <span className={`roster-status roster-status--${agent.status}`}>{agent.status}</span>
+                <span className={`ap-md-roster-status ap-md-roster-status--${agent.status}`}>
+                  {agent.status}
+                </span>
               </div>
-              <span className="roster-role">{agent.role}</span>
-              <span className="roster-action">{agent.currentAction}</span>
-              {agent.demo ? <span className="demo-badge">demo</span> : null}
+              <div className="ap-md-roster-meta">
+                {agent.role} · <em>{agent.currentAction}</em>
+                {agent.demo ? <span className="demo-badge ap-md-demo"> demo</span> : null}
+              </div>
             </li>
           ))}
         </ul>

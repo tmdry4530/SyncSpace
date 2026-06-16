@@ -7,6 +7,7 @@ import { EditorPanel } from '../../features/editor/components/EditorPanel'
 import { useDocumentsQuery } from '../../features/documents/queries/useDocumentsQuery'
 import { usePresenceUiStore } from '../../shared/stores/presenceStore'
 import { useWorkspaceUiStore } from '../../shared/stores/workspaceUiStore'
+import '../../styles/apple/workbench.css'
 
 export function WorkspaceSplitPage() {
   const { workspaceId, channelId, documentId } = useParams()
@@ -85,92 +86,104 @@ export function WorkspaceSplitPage() {
     setBannerDismissed(true)
   }
 
+  const docTitle = selectedDocument?.title ?? '문서'
+  const channelLabel = selectedChannel ? `#${selectedChannel.name}` : '채팅'
+  // The mock chat column sits on the right at 320px; the resizer adjusts chatWidth
+  // (a left-anchored percentage). Feed the inverse so the divider still tracks the drag.
+  const chatColWidth = `${Math.max(24, Math.min(56, 100 - chatWidth))}%`
+
   return (
-    <section className="workspace-canvas" aria-label="채팅과 문서 동시 협업 화면">
-      <div className="workbench-commandbar">
-        <div className="workbench-commandbar-copy">
-          <p className="eyebrow">워크벤치</p>
-          <h1>
-            {selectedChannel ? `#${selectedChannel.name}` : '채팅'} · {selectedDocument?.title ?? '문서'}
-          </h1>
-          {!bannerDismissed ? (
-            <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p>
-          ) : null}
-        </div>
-        <div className="workbench-commandbar-actions">
-          <span className={`status-summary ${unifiedStatus}`} aria-label={`${statusLabel}, ${presenceCount}명 접속 중`}>
-            <span>{statusLabel}</span>
-            <em>{presenceCount}명 접속 중</em>
-          </span>
-          {!bannerDismissed ? (
-            <button className="banner-dismiss-button" onClick={dismissWorkbenchHelp} type="button">
-              <EyeOff size={15} />
-              안내 숨기기
-            </button>
-          ) : null}
-        </div>
+    <section className="workspace-canvas ap-wb-canvas" aria-label="채팅과 문서 동시 협업 화면">
+      <div className="ap-wb-intro">
+        <p className="ap-wb-eyebrow">04 · 워크벤치</p>
+        <h2>문서 우위 · 타입 주도</h2>
+        {!bannerDismissed ? <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p> : null}
       </div>
 
-      <div className="mobile-pane-switcher" role="tablist" aria-label="모바일 작업 패널 선택">
-        <button
-          className={activeMobilePane === 'chat' ? 'active' : ''}
-          onClick={() => setActiveMobilePane('chat')}
-          type="button"
-          role="tab"
-          aria-selected={activeMobilePane === 'chat'}
-        >
-          채팅
-        </button>
-        <button
-          className={activeMobilePane === 'document' ? 'active' : ''}
-          onClick={() => setActiveMobilePane('document')}
-          type="button"
-          role="tab"
-          aria-selected={activeMobilePane === 'document'}
-        >
-          문서
-        </button>
-      </div>
-
-      <div className="split-workbench" style={{ ['--chat-pane-width' as string]: `${chatWidth}%` }}>
-        <div className={`split-pane chat-side ${activeMobilePane === 'chat' ? 'mobile-active' : ''}`}>
-          {selectedChannelId ? (
-            <ChatPanel
-              workspaceId={workspaceId}
-              channelId={selectedChannelId}
-              channelName={selectedChannel?.name}
-              hideStatus
-              variant="workbench"
-              readOnly
-            />
-          ) : (
-            <EmptySplitPane title="채널이 없습니다" copy="에이전트가 첫 채널을 만들면 이곳에서 관전할 수 있습니다." loading={isLoading} />
-          )}
+      <div className="ap-wb-frame">
+        <div className="ap-wb-topbar">
+          <div className="ap-wb-topbar-title">
+            <span className="ap-wb-topbar-tag">워크벤치</span>
+            <span className="ap-wb-topbar-name">
+              {channelLabel} · {docTitle}
+            </span>
+          </div>
+          <div className="ap-wb-topbar-actions">
+            <span
+              className={`ap-wb-presence-pill is-${unifiedStatus}`}
+              aria-label={`${statusLabel}, ${presenceCount}명 접속 중`}
+            >
+              <span className="ap-wb-dot" aria-hidden="true" />
+              {presenceCount > 0 ? `${presenceCount}명 접속 중` : statusLabel}
+            </span>
+            {!bannerDismissed ? (
+              <button className="ap-wb-dismiss" onClick={dismissWorkbenchHelp} type="button">
+                <EyeOff size={14} />
+                안내 숨기기
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <button
-          className={`resizer ${isDragging ? 'dragging' : ''}`}
-          onMouseDown={() => setIsDragging(true)}
-          type="button"
-          aria-label="채팅과 문서 패널 너비 조절"
-        >
-          <span className="resizer-handle" />
-        </button>
+        <div className="ap-wb-mobile-switch" role="tablist" aria-label="모바일 작업 패널 선택">
+          <button
+            className={activeMobilePane === 'document' ? 'is-active' : ''}
+            onClick={() => setActiveMobilePane('document')}
+            type="button"
+            role="tab"
+            aria-selected={activeMobilePane === 'document'}
+          >
+            문서
+          </button>
+          <button
+            className={activeMobilePane === 'chat' ? 'is-active' : ''}
+            onClick={() => setActiveMobilePane('chat')}
+            type="button"
+            role="tab"
+            aria-selected={activeMobilePane === 'chat'}
+          >
+            채팅
+          </button>
+        </div>
 
-        <div className={`split-pane doc-side ${activeMobilePane === 'document' ? 'mobile-active' : ''}`}>
-          {selectedDocumentId ? (
-            <EditorPanel
-              workspaceId={workspaceId}
-              documentId={selectedDocumentId}
-              documentTitle={selectedDocument?.title}
-              documents={documents}
-              hideStatus
-              variant="workbench"
-              readOnly
-            />
-          ) : (
-            <EmptySplitPane title="문서가 없습니다" copy="에이전트가 첫 문서를 만들면 이곳에서 관전할 수 있습니다." loading={isLoading} />
-          )}
+        <div className="split-workbench ap-wb-body" style={{ ['--ap-wb-chat-w' as string]: chatColWidth }}>
+          <div className={`split-pane doc-side ap-wb-pane ap-wb-pane--doc ${activeMobilePane === 'document' ? 'mobile-active is-mobile-active' : ''}`}>
+            {selectedDocumentId ? (
+              <EditorPanel
+                workspaceId={workspaceId}
+                documentId={selectedDocumentId}
+                documentTitle={selectedDocument?.title}
+                documents={documents}
+                hideStatus
+                variant="workbench"
+                readOnly
+              />
+            ) : (
+              <EmptySplitPane title="문서가 없습니다" copy="에이전트가 첫 문서를 만들면 이곳에서 관전할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
+
+          <button
+            className={`resizer ap-wb-resizer ${isDragging ? 'dragging is-dragging' : ''}`}
+            onMouseDown={() => setIsDragging(true)}
+            type="button"
+            aria-label="문서와 채팅 패널 너비 조절"
+          />
+
+          <div className={`split-pane chat-side ap-wb-pane ap-wb-pane--chat ${activeMobilePane === 'chat' ? 'mobile-active is-mobile-active' : ''}`}>
+            {selectedChannelId ? (
+              <ChatPanel
+                workspaceId={workspaceId}
+                channelId={selectedChannelId}
+                channelName={selectedChannel?.name}
+                hideStatus
+                variant="workbench"
+                readOnly
+              />
+            ) : (
+              <EmptySplitPane title="채널이 없습니다" copy="에이전트가 첫 채널을 만들면 이곳에서 관전할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -200,8 +213,8 @@ function readHelpDismissed(): boolean {
 
 function EmptySplitPane({ title, copy, loading }: { title: string; copy: string; loading: boolean }) {
   return (
-    <div className="empty-split-pane">
-      <p className="eyebrow">{loading ? 'LOADING' : 'EMPTY'}</p>
+    <div className="empty-split-pane ap-wb-empty-pane">
+      <p className="ap-wb-eyebrow">{loading ? 'LOADING' : 'EMPTY'}</p>
       <h2>{loading ? '불러오는 중...' : title}</h2>
       <p>{loading ? '워크스페이스 항목을 확인하고 있습니다.' : copy}</p>
     </div>

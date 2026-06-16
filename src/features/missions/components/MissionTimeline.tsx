@@ -53,11 +53,11 @@ interface MissionTimelineProps {
 export function MissionTimeline({ events, selectedSeq, onSelect }: MissionTimelineProps) {
   return (
     <section className="mission-timeline" aria-label="이벤트 타임라인">
-      <p className="eyebrow">타임라인</p>
+      <p className="eyebrow ap-md-eyebrow">타임라인</p>
       {events.length === 0 ? (
-        <p className="mission-empty-note">표시할 엔지니어링 이벤트가 없습니다.</p>
+        <p className="mission-empty-note ap-md-empty">표시할 엔지니어링 이벤트가 없습니다.</p>
       ) : (
-        <ol className="timeline-list">
+        <ol className="ap-md-timeline-list">
           {events.map((ev) => {
             const eng = ev.engineeringEvent
             const displayTime = eventDisplayTime(eng.timestamp, ev.createdAt)
@@ -65,7 +65,7 @@ export function MissionTimeline({ events, selectedSeq, onSelect }: MissionTimeli
             return (
               <li
                 key={ev.seq}
-                className={`timeline-row${isSelected ? ' timeline-row--selected' : ''}`}
+                className={`ap-md-timeline-row${isSelected ? ' ap-md-timeline-row--selected' : ''}`}
                 onClick={() => onSelect(ev.seq)}
                 role="button"
                 tabIndex={0}
@@ -77,16 +77,16 @@ export function MissionTimeline({ events, selectedSeq, onSelect }: MissionTimeli
                 }}
                 aria-pressed={isSelected}
               >
-                <span className="timeline-icon" aria-hidden="true">
+                <span className="ap-md-timeline-icon" aria-hidden="true">
                   {KIND_ICON[eng.kind]}
                 </span>
-                <div className="timeline-row-body">
-                  <span className="timeline-kind">{KIND_LABEL[eng.kind]}</span>
-                  <span className="timeline-summary">{summariseEvent(ev)}</span>
+                <div className="ap-md-timeline-body">
+                  <span className="ap-md-timeline-kind">{KIND_LABEL[eng.kind]}</span>
+                  <span className="ap-md-timeline-summary">{summariseEvent(ev)}</span>
                 </div>
-                <div className="timeline-meta">
-                  {eng.demo ? <span className="demo-badge">demo</span> : null}
-                  <time className="timeline-time" dateTime={displayTime} title={displayTime}>
+                <div className="ap-md-timeline-meta">
+                  {eng.demo ? <span className="demo-badge ap-md-demo">demo</span> : null}
+                  <time className="ap-md-timeline-time" dateTime={displayTime} title={displayTime}>
                     {relativeTime(displayTime)}
                   </time>
                 </div>

@@ -9,7 +9,7 @@ import { agentIdentityToProfile } from '../../../shared/api/profiles'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
 import { useJoinWorkspaceMutation } from '../queries/useJoinWorkspaceMutation'
 import { useRotateInviteCodeMutation } from '../queries/useRotateInviteCodeMutation'
-import { Copy, Check, LogOut, User, KeyRound, ChevronDown, LogIn, RefreshCw, Sun, Moon, Monitor } from 'lucide-react'
+import { Copy, Check, LogOut, KeyRound, ChevronDown, LogIn, RefreshCw, Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme } from '../../../shared/hooks/useTheme'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
@@ -34,6 +34,7 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const workspace = workspaces.find((item) => item.id === workspaceId)
   const displayName = formatDisplayName(identity?.displayName)
   const chipColor = identity ? agentIdentityToProfile(identity).color : '#94a3b8'
+  const avatarInitial = (displayName?.trim()?.[0] ?? 'A').toUpperCase()
   const identityLabel = identity
     ? `${identity.role ? agentRoleLabel(identity.role) : '외부 에이전트'} · @${identity.slug}`
     : ''
@@ -125,12 +126,12 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <header className="workspace-header">
-      <div className="header-brand">
-        <p className="eyebrow">현재 워크스페이스</p>
-        <div className="dropdown-container" ref={workspaceMenuRef}>
+    <header className="ap-shell-header">
+      <div className="ap-shell-header-brand">
+        <p className="ap-shell-eyebrow">현재 워크스페이스</p>
+        <div className="ap-shell-dropdown" ref={workspaceMenuRef}>
           <button
-            className={workspaceMenuOpen ? 'workspace-switch-trigger open' : 'workspace-switch-trigger'}
+            className={workspaceMenuOpen ? 'ap-shell-ws-trigger open' : 'ap-shell-ws-trigger'}
             onClick={() => (workspaceMenuOpen ? closeWorkspaceMenu() : setWorkspaceMenuOpen(true))}
             aria-expanded={workspaceMenuOpen}
             aria-haspopup="true"
@@ -138,32 +139,32 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
             type="button"
           >
             <h2>{workspace?.name ?? '워크스페이스'}</h2>
-            <ChevronDown size={16} aria-hidden="true" />
+            <ChevronDown size={14} aria-hidden="true" />
           </button>
 
           {workspaceMenuOpen && (
-            <div className="dropdown-menu workspace-switch-menu">
-              <div className="dropdown-header">워크스페이스</div>
+            <div className="ap-shell-menu ap-shell-menu--left">
+              <div className="ap-shell-menu-header">워크스페이스</div>
               {workspaces.map((item) => {
                 const active = item.id === workspaceId
                 return (
                   <button
                     key={item.id}
-                    className={active ? 'dropdown-item workspace-switch-item active' : 'dropdown-item workspace-switch-item'}
+                    className={active ? 'ap-shell-menu-item active' : 'ap-shell-menu-item'}
                     onClick={() => selectWorkspace(item.id)}
                     type="button"
                     aria-current={active ? 'true' : undefined}
                   >
-                    <span className="workspace-switch-name">{item.name}</span>
-                    {active && <Check size={16} aria-hidden="true" />}
+                    <span className="ap-shell-ws-name">{item.name}</span>
+                    {active && <Check size={16} aria-hidden="true" className="ap-shell-ws-check" />}
                   </button>
                 )
               })}
-              <div className="dropdown-divider"></div>
+              <div className="ap-shell-menu-divider"></div>
               {joinFormOpen ? (
-                <form className="workspace-join-form" onSubmit={submitJoinCode}>
+                <form className="ap-shell-join-form" onSubmit={submitJoinCode}>
                   <input
-                    className="workspace-join-input"
+                    className="ap-shell-join-input"
                     value={joinCode}
                     onChange={(event) => setJoinCode(event.target.value)}
                     placeholder="초대 코드"
@@ -171,17 +172,17 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
                     autoFocus
                   />
                   <button
-                    className="button primary small"
+                    className="ap-shell-primary-btn"
                     type="submit"
                     disabled={joinMutation.isPending || joinCode.trim().length === 0}
                   >
                     {joinMutation.isPending ? '합류 중…' : '합류'}
                   </button>
-                  {joinError && <p className="workspace-join-error">{joinError}</p>}
+                  {joinError && <p className="ap-shell-error">{joinError}</p>}
                 </form>
               ) : (
                 <button
-                  className="dropdown-item"
+                  className="ap-shell-menu-item"
                   onClick={() => {
                     setJoinFormOpen(true)
                     setJoinError(null)
@@ -197,45 +198,53 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
         </div>
       </div>
 
-      <div className="header-actions">
+      <div className="ap-shell-actions">
         <button
           type="button"
-          className="icon-button theme-toggle"
+          className="ap-shell-icon-btn"
           onClick={() => setTheme(nextTheme)}
           aria-label={`테마: ${themeLabel} (클릭하여 변경)`}
           title={`테마: ${themeLabel}`}
         >
           <ThemeIcon size={16} aria-hidden="true" />
         </button>
-        <span className="spectator-badge" title="웹 앱은 관전 전용입니다. 활동은 에이전트만 수행할 수 있습니다.">
+        <span
+          className="ap-shell-spectator"
+          title="웹 앱은 관전 전용입니다. 활동은 에이전트만 수행할 수 있습니다."
+        >
           관전 모드
         </span>
         {workspace?.inviteCode && (
-          <div className="dropdown-container" ref={inviteRef}>
+          <div className="ap-shell-dropdown" ref={inviteRef}>
             <button
-              className={inviteOpen ? 'invite-trigger open' : 'invite-trigger'}
+              className={inviteOpen ? 'ap-shell-pill-btn open' : 'ap-shell-pill-btn'}
               onClick={() => setInviteOpen(!inviteOpen)}
               aria-expanded={inviteOpen}
               aria-haspopup="true"
               aria-label="초대 코드 보기"
               type="button"
             >
-              <KeyRound size={16} />
+              <KeyRound size={13} aria-hidden="true" />
               <span>초대 코드</span>
-              <ChevronDown size={14} aria-hidden="true" />
+              <ChevronDown size={13} aria-hidden="true" />
             </button>
             {inviteOpen && (
-              <div className="dropdown-menu">
-                <div className="dropdown-header">팀원 초대 코드</div>
-                <div className="invite-box">
-                  <span className="invite-code">{workspace.inviteCode}</span>
-                  <button className="button ghost small invite-copy-button" onClick={copyInviteCode} type="button" aria-label="초대 코드 복사">
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
+              <div className="ap-shell-menu">
+                <div className="ap-shell-menu-header">팀원 초대 코드</div>
+                <div className="ap-shell-invite-box">
+                  <span className="ap-shell-invite-code">{workspace.inviteCode}</span>
+                  <button
+                    className="ap-shell-mini-btn"
+                    onClick={copyInviteCode}
+                    type="button"
+                    aria-label="초대 코드 복사"
+                  >
+                    {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
                     {copied ? '복사됨' : '복사'}
                   </button>
                 </div>
                 <button
-                  className="button ghost small invite-rotate-button"
+                  className="ap-shell-mini-btn ap-shell-rotate-btn"
                   onClick={rotateInviteCode}
                   type="button"
                   disabled={rotateMutation.isPending}
@@ -244,43 +253,47 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
                   <RefreshCw size={16} aria-hidden="true" />
                   {rotateMutation.isPending ? '재발급 중…' : '코드 재발급'}
                 </button>
-                {rotateError && <p className="workspace-join-error">{rotateError}</p>}
+                {rotateError && <p className="ap-shell-error">{rotateError}</p>}
               </div>
             )}
           </div>
         )}
 
-        <div className="dropdown-container" ref={menuRef}>
+        <div className="ap-shell-dropdown" ref={menuRef}>
           <button
-            className="user-menu-button"
+            className="ap-shell-agent-btn"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-expanded={menuOpen}
             aria-haspopup="true"
             aria-label="에이전트 메뉴"
             type="button"
           >
-            <span className="user-chip" style={{ ['--chip-color' as string]: chipColor }}>
-              <User size={14} style={{ marginRight: '6px' }} />
-              {displayName}
+            <span className="ap-shell-agent-chip" style={{ ['--ap-chip-color' as string]: chipColor }}>
+              <span className="ap-shell-agent-avatar" aria-hidden="true">
+                {avatarInitial}
+              </span>
+              <span className="ap-shell-agent-name">{displayName}</span>
             </span>
           </button>
 
           {menuOpen && (
-            <div className="dropdown-menu">
-              <div className="dropdown-item user-info">
+            <div className="ap-shell-menu">
+              <div className="ap-shell-menu-item ap-shell-user-info">
                 <strong>{displayName}</strong>
                 <small>{identityLabel}</small>
                 {/* The active credential — so it's obvious WHICH agent you're
                     signed in as (a different agent sees different workspaces). */}
-                {identity?.agentId ? <small className="user-info-id">로그인: {identity.agentId.slice(0, 8)}…</small> : null}
+                {identity?.agentId ? (
+                  <small className="ap-shell-user-id">로그인: {identity.agentId.slice(0, 8)}…</small>
+                ) : null}
               </div>
-              <div className="dropdown-divider"></div>
-              <button className="dropdown-item" onClick={signOut} type="button">
-                <LogIn size={16} />
+              <div className="ap-shell-menu-divider"></div>
+              <button className="ap-shell-menu-item" onClick={signOut} type="button">
+                <LogIn size={16} aria-hidden="true" />
                 다른 에이전트로 로그인
               </button>
-              <button className="dropdown-item text-danger" onClick={signOut} type="button">
-                <LogOut size={16} />
+              <button className="ap-shell-menu-item text-danger" onClick={signOut} type="button">
+                <LogOut size={16} aria-hidden="true" />
                 로그아웃
               </button>
             </div>

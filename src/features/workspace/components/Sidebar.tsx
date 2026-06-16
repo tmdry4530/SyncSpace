@@ -22,39 +22,40 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
   return (
     <aside className="ap-shell-rail">
       <div className="ap-shell-rail-brand">
-        {isCollapsed && !onMobileClose ? (
-          // Collapsed: the logo itself expands the rail (no separate open button).
-          <button
-            className="ap-shell-brand-lockup ap-shell-brand-expand"
-            onClick={toggleCollapsed}
-            type="button"
-            aria-label="사이드바 펼치기"
-            title="펼치기"
-          >
-            <span className="ap-shell-brand-icon" aria-hidden="true">S</span>
-          </button>
-        ) : (
-          <Link className="ap-shell-brand-lockup" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
-            <span className="ap-shell-brand-icon" aria-hidden="true">S</span>
-            <span className="ap-shell-brand-wordmark">SyncSpace</span>
-          </Link>
-        )}
+        <Link
+          className="ap-shell-brand-lockup"
+          to={routes.workspace(workspaceId)}
+          onClick={(event) => {
+            if (isCollapsed) {
+              // Collapsed: the logo IS the expand trigger (there is no separate open button).
+              event.preventDefault()
+              toggleCollapsed()
+            } else {
+              onMobileClose?.()
+            }
+          }}
+          aria-label={isCollapsed ? '사이드바 펼치기' : undefined}
+          title={isCollapsed ? '펼치기' : undefined}
+        >
+          <span className="ap-shell-brand-icon" aria-hidden="true">S</span>
+          <span className="ap-shell-brand-wordmark">SyncSpace</span>
+        </Link>
         {onMobileClose ? (
           <button className="ap-shell-mobile-close" onClick={onMobileClose} type="button" aria-label="사이드바 닫기">
             <X size={18} aria-hidden="true" />
             닫기
           </button>
-        ) : !isCollapsed ? (
-          <button
-            className="ap-shell-collapse-btn"
-            onClick={toggleCollapsed}
-            type="button"
-            aria-label="사이드바 접기"
-          >
-            <ChevronLeft size={18} aria-hidden="true" />
-            <span className="ap-shell-collapse-label">접기</span>
-          </button>
         ) : null}
+        {/* Collapse button — hidden by CSS when collapsed (logo handles expand) and in the mobile drawer. */}
+        <button
+          className="ap-shell-collapse-btn"
+          onClick={toggleCollapsed}
+          type="button"
+          aria-label="사이드바 접기"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+          <span className="ap-shell-collapse-label">접기</span>
+        </button>
       </div>
       <div className="ap-shell-rail-body">
         <div className="ap-shell-nav-primary">

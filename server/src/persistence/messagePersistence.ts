@@ -1,18 +1,24 @@
 import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ServerConfig } from '../config.js'
-import { hasSupabaseAdminConfig } from '../config.js'
-import type { ChatMessage, PaginatedChatMessages, UserProfile } from '../types/contracts.js'
+import { hasDatabaseConfig, hasSupabaseAdminConfig } from '../config.js'
+import type { ChatMessage, PaginatedChatMessages, ParticipantType, UserProfile } from '../types/contracts.js'
 import type { Logger } from '../utils/logger.js'
 import { createSupabaseAdminClient } from './supabaseAdmin.js'
+import { createPostgresMessagePersistenceAdapter } from './messagePersistencePg.js'
 
 export interface MessagePersistInput {
   id?: string
   channelId: string
-  userId: string
+  userId?: string | null
   content: string
   clientId?: string | null
   createdAt?: string
+  authorParticipantId?: string | null
+  authorType?: ParticipantType
+  agentId?: string | null
+  a2aMessageId?: string | null
+  metadata?: Record<string, unknown>
 }
 
 export interface ListMessagesInput {
@@ -115,12 +121,14 @@ export class SupabaseMessagePersistenceAdapter implements MessagePersistenceAdap
 }
 
 export function createMessagePersistenceAdapter(config: ServerConfig, logger: Logger): MessagePersistenceAdapter {
-  if (!hasSupabaseAdminConfig(config)) {
-    logger.warn('Supabase service-role configuration is missing; chat messages will use in-memory noop persistence')
-    return new NoopMessagePersistenceAdapter()
+  if (hasDatabaseConfig(config)) {
+    return createPostgresMessagePersistenceAdapter()
   }
-
-  return new SupabaseMessagePersistenceAdapter(createSupabaseAdminClient(config))
+  if (hasSupabaseAdminConfig(config)) {
+    return new SupabaseMessagePersistenceAdapter(createSupabaseAdminClient(config))
+  }
+  logger.warn('No DATABASE_URL or Supabase config; chat messages will use in-memory noop persistence')
+  return new NoopMessagePersistenceAdapter()
 }
 
 const messageSelectColumns = `
@@ -143,7 +151,7 @@ function toChatMessage(input: MessagePersistInput): ChatMessage {
   return {
     id: input.id ?? randomUUID(),
     channelId: input.channelId,
-    userId: input.userId,
+    userId: input.userId ?? input.authorParticipantId ?? '',
     content: input.content,
     createdAt: input.createdAt ?? new Date().toISOString(),
     ...(clientId ? { clientId } : {}),
@@ -155,7 +163,7 @@ function toMessageRow(input: MessagePersistInput): Record<string, string | null>
   return {
     id: input.id ?? randomUUID(),
     channel_id: input.channelId,
-    user_id: input.userId,
+    user_id: input.userId ?? null,
     content: input.content,
     client_id: input.clientId ?? null,
     created_at: input.createdAt ?? new Date().toISOString()

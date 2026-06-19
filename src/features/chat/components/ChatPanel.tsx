@@ -42,14 +42,32 @@ export function ChatPanel({
     )
   }, [historyQuery.data?.pages, realtime.messages])
 
+  if (isWorkbenchPane) {
+    return (
+      <section className="chat-panel chat-panel--workbench ap-wb-chat">
+        <header className="panel-title panel-title--workbench ap-wb-chat-head">
+          <h1>채팅</h1>
+        </header>
+        <MessageList
+          messages={messages}
+          isLoading={historyQuery.isLoading}
+          onLoadMore={() => void historyQuery.fetchNextPage()}
+          canLoadMore={Boolean(historyQuery.hasNextPage)}
+          variant="workbench"
+        />
+        <MessageComposer channelId={channelId} onSend={realtime.sendMessage} variant="workbench" />
+      </section>
+    )
+  }
+
   return (
-    <section className={`chat-panel ${isWorkbenchPane ? 'chat-panel--workbench' : ''}`}>
-      <header className={`panel-title ${isWorkbenchPane ? 'panel-title--workbench' : ''}`}>
+    <section className="chat-panel">
+      <header className="panel-title">
         <div>
-          {isWorkbenchPane ? null : <p className="eyebrow">채팅</p>}
-          <h1>{isWorkbenchPane ? '채팅' : `#${channelName ?? channelId.slice(0, 8)}`}</h1>
+          <p className="eyebrow">채팅</p>
+          <h1>{`#${channelName ?? channelId.slice(0, 8)}`}</h1>
         </div>
-        {hideStatus || isWorkbenchPane ? null : <span className={`status-pill ${status}`}>{status}</span>}
+        {hideStatus ? null : <span className={`status-pill ${status}`}>{status}</span>}
       </header>
       <MessageList
         messages={messages}

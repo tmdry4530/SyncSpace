@@ -7,6 +7,10 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/favicon.ico" />
     <title>SyncSpace</title>
+    <!-- Apply the saved theme before first paint so there is no light-mode flash.
+         Only writes an explicit light/dark choice; "system" leaves the attribute
+         absent so the prefers-color-scheme media query resolves the default. -->
+    <script>(function(){try{var t=localStorage.getItem('syncspace-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();</script>
   </head>
   <body>
     <div id="root"></div>

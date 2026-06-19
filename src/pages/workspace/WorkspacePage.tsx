@@ -6,15 +6,15 @@ import { useCreateWorkspaceMutation } from '../../features/workspace/queries/use
 import { useJoinWorkspaceMutation } from '../../features/workspace/queries/useJoinWorkspaceMutation'
 import { useDeleteWorkspaceMutation } from '../../features/workspace/queries/useDeleteWorkspaceMutation'
 import { useWorkspacesQuery } from '../../features/workspace/queries/useWorkspacesQuery'
-import { getSupabaseClient } from '../../shared/api/supabaseClient'
+import { logout } from '../../shared/api/authApi'
 import { toAppError } from '../../shared/api/errors'
 import { useAuthStore } from '../../shared/stores/authStore'
 import { formatDisplayName } from '../../shared/utils/displayName'
 
 export function WorkspacePage() {
   const navigate = useNavigate()
-  const profile = useAuthStore((state) => state.profile)
   const user = useAuthStore((state) => state.user)
+  const reset = useAuthStore((state) => state.reset)
   const { data: workspaces = [], isLoading, error } = useWorkspacesQuery()
   const createWorkspace = useCreateWorkspaceMutation()
   const joinWorkspace = useJoinWorkspaceMutation()
@@ -51,7 +51,12 @@ export function WorkspacePage() {
   }
 
   async function signOut() {
-    await getSupabaseClient()?.auth.signOut()
+    try {
+      await logout()
+    } finally {
+      reset()
+      navigate(routes.login, { replace: true })
+    }
   }
 
   function handleDeleteWorkspace(workspaceId: string, workspaceName: string) {
@@ -66,7 +71,7 @@ export function WorkspacePage() {
   const joinError = joinWorkspace.error ? toAppError(joinWorkspace.error).message : null
   const loadError = error ? toAppError(error).message : null
   const deleteError = deleteWorkspace.error ? toAppError(deleteWorkspace.error).message : null
-  const displayName = formatDisplayName(profile?.displayName ?? user?.email)
+  const displayName = formatDisplayName(user?.displayName ?? user?.email)
 
   return (
     <main className="workspace-index">
@@ -76,7 +81,7 @@ export function WorkspacePage() {
           <span>SyncSpace</span>
         </Link>
         <div className="workspace-index-user">
-          <span>{user?.email ?? profile?.displayName ?? '사용자'}</span>
+          <span>{user?.email ?? user?.displayName ?? '사용자'}</span>
           <button className="link-button" onClick={signOut} type="button">로그아웃</button>
         </div>
       </header>

@@ -77,3 +77,11 @@ export interface PaginatedChatMessages {
   items: ChatMessage[]
   nextCursor: string | null
 }
+
+export interface AuthUser {
+  id: ID
+  email: string
+  displayName: string
+  avatarUrl: string | null
+  color: string
+}

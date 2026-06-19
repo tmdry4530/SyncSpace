@@ -1,25 +1,22 @@
-import type { Session, User } from '@supabase/supabase-js'
 import { create } from 'zustand'
-import type { UserProfile } from '../types/contracts'
+import type { AuthUser } from '../types/contracts'
 
 interface AuthState {
-  session: Session | null
-  user: User | null
-  profile: UserProfile | null
+  user: AuthUser | null
+  participantId: string | null
   isLoading: boolean
-  setSession: (session: Session | null) => void
-  setProfile: (profile: UserProfile | null) => void
+  setUser: (user: AuthUser | null) => void
+  setParticipantId: (participantId: string | null) => void
   setLoading: (isLoading: boolean) => void
   reset: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  session: null,
   user: null,
-  profile: null,
+  participantId: null,
   isLoading: true,
-  setSession: (session) => set({ session, user: session?.user ?? null }),
-  setProfile: (profile) => set({ profile }),
+  setUser: (user) => set({ user }),
+  setParticipantId: (participantId) => set({ participantId }),
   setLoading: (isLoading) => set({ isLoading }),
-  reset: () => set({ session: null, user: null, profile: null, isLoading: false })
+  reset: () => set({ user: null, participantId: null, isLoading: false })
 }))

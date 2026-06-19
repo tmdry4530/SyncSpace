@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { postBackendJson } from '../../../shared/api/backendClient'
 import type { Workspace } from '../../../shared/types/contracts'
-import { mapWorkspace, workspaceKeys } from './useWorkspacesQuery'
+import { workspaceKeys } from './useWorkspacesQuery'
 
 export function useCreateWorkspaceMutation() {
   const queryClient = useQueryClient()

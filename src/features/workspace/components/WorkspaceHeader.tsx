@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { routes } from '../../../app/router/routes'
-import { getSupabaseClient } from '../../../shared/api/supabaseClient'
+import { logout } from '../../../shared/api/authApi'
 import { useAuthStore } from '../../../shared/stores/authStore'
 import { formatDisplayName } from '../../../shared/utils/displayName'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
@@ -9,9 +9,10 @@ import { Copy, Check, LogOut, LayoutGrid, User, KeyRound, ChevronDown, Sun, Moon
 import { useTheme } from '../../../shared/hooks/useTheme'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
+  const navigate = useNavigate()
   const { data: workspaces = [] } = useWorkspacesQuery()
-  const profile = useAuthStore((state) => state.profile)
   const user = useAuthStore((state) => state.user)
+  const reset = useAuthStore((state) => state.reset)
   const [copied, setCopied] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -20,7 +21,7 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
   const themeLabel = theme === 'system' ? '시스템' : theme === 'light' ? '라이트' : '다크'
   const workspace = workspaces.find((item) => item.id === workspaceId)
-  const displayName = formatDisplayName(profile?.displayName ?? user?.email)
+  const displayName = formatDisplayName(user?.displayName ?? user?.email)
   const menuRef = useRef<HTMLDivElement>(null)
   const inviteRef = useRef<HTMLDivElement>(null)
 
@@ -48,7 +49,12 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   }, [])
 
   async function signOut() {
-    await getSupabaseClient()?.auth.signOut()
+    try {
+      await logout()
+    } finally {
+      reset()
+      navigate(routes.login, { replace: true })
+    }
   }
 
   async function copyInviteCode() {
@@ -126,7 +132,7 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
             aria-label="사용자 메뉴"
             type="button"
           >
-            <span className="user-chip" style={{ ['--chip-color' as string]: profile?.color ?? '#94a3b8' }}>
+            <span className="user-chip" style={{ ['--chip-color' as string]: user?.color ?? '#94a3b8' }}>
               <User size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
               {displayName}
             </span>

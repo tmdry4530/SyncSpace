@@ -2,17 +2,16 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import '../../styles/apple/login.css'
 import { routes } from '../../app/router/routes'
-import { getSupabaseClient } from '../../shared/api/supabaseClient'
-import { ensureUserProfile } from '../../shared/api/profiles'
+import { login, register } from '../../shared/api/authApi'
 import { toAppError } from '../../shared/api/errors'
 import { useAuthStore } from '../../shared/stores/authStore'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const session = useAuthStore((state) => state.session)
-  const setSession = useAuthStore((state) => state.setSession)
-  const setLoading = useAuthStore((state) => state.setLoading)
+  const user = useAuthStore((state) => state.user)
+  const setUser = useAuthStore((state) => state.setUser)
+  const setParticipantId = useAuthStore((state) => state.setParticipantId)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -23,28 +22,8 @@ export function LoginPage() {
   const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? routes.workspaces
 
   useEffect(() => {
-    const supabase = getSupabaseClient()
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-    let alive = true
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (alive) setSession(data.session)
-      })
-      .finally(() => {
-        if (alive) setLoading(false)
-      })
-    return () => {
-      alive = false
-    }
-  }, [setLoading, setSession])
-
-  useEffect(() => {
-    if (session) navigate(from, { replace: true })
-  }, [from, navigate, session])
+    if (user) navigate(from, { replace: true })
+  }, [from, navigate, user])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -52,35 +31,19 @@ export function LoginPage() {
     setSuccess(null)
     setSubmitting(true)
 
-    const supabase = getSupabaseClient()
-    if (!supabase) {
-      setError('Supabase 환경변수를 먼저 설정하세요.')
+    try {
+      const account =
+        mode === 'login'
+          ? await login({ email, password })
+          : await register({ email, password, displayName: email.split('@')[0] ?? email })
+      setUser(account.user)
+      setParticipantId(account.participantId)
+      navigate(from, { replace: true })
+    } catch (caught) {
+      setError(getAuthErrorMessage(toAppError(caught).message))
+    } finally {
       setSubmitting(false)
-      return
     }
-
-    const result =
-      mode === 'login'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password, options: { data: { displayName: email.split('@')[0] } } })
-
-    setSubmitting(false)
-    if (result.error) {
-      setError(getAuthErrorMessage(toAppError(result.error).message))
-      return
-    }
-
-    if (result.data.user) {
-      void ensureUserProfile(result.data.user).catch(() => undefined)
-    }
-
-    if (mode === 'signup' && !result.data.session) {
-      setSuccess('가입 요청이 접수되었습니다. 이메일 확인이 필요한 프로젝트라면 받은 편지함을 확인하세요.')
-      setMode('login')
-      return
-    }
-
-    navigate(from, { replace: true })
   }
 
   function switchMode(next: 'login' | 'signup') {
@@ -139,7 +102,7 @@ export function LoginPage() {
               <input
                 className="ap-login-input"
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                minLength={6}
+                minLength={8}
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 type="password"
@@ -155,7 +118,7 @@ export function LoginPage() {
           </form>
 
           <p className="ap-login-hint is-spaced">
-            로컬 Supabase seed를 적용한 경우에만 <code>ada@syncspace.dev / password123</code> 계정을 사용할 수 있습니다.
+            계정으로 로그인하거나, 위의 가입 탭에서 이메일과 비밀번호로 새 계정을 만드세요.
           </p>
         </section>
       </div>
@@ -165,8 +128,7 @@ export function LoginPage() {
 
 function getAuthErrorMessage(message: string): string {
   const normalized = message.toLowerCase()
-  if (normalized.includes('invalid login credentials')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
-  if (normalized.includes('email not confirmed')) return '이메일 확인이 필요합니다. 받은 편지함을 확인하세요.'
-  if (normalized.includes('user already registered')) return '이미 가입된 이메일입니다. 로그인으로 다시 시도하세요.'
+  if (normalized.includes('invalid') && normalized.includes('credential')) return '이메일 또는 비밀번호가 올바르지 않습니다.'
+  if (normalized.includes('already')) return '이미 가입된 이메일입니다. 로그인으로 다시 시도하세요.'
   return message
 }

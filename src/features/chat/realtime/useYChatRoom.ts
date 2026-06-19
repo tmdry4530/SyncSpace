@@ -4,6 +4,7 @@ import { useConnectionStatus } from '../../realtime/useConnectionStatus'
 import { useYAwareness } from '../../realtime/useYAwareness'
 import { useYDoc } from '../../realtime/useYDoc'
 import { useYProvider } from '../../realtime/useYProvider'
+import { authUserToPresenceUser, authUserToProfile } from '../../../shared/api/profiles'
 import { useAuthStore } from '../../../shared/stores/authStore'
 import type { ChatMessage, PresenceUser } from '../../../shared/types/contracts'
 import { getChatRoomName, getChatWsUrl } from '../../../shared/utils/roomNames'
@@ -11,8 +12,9 @@ import { getChatRoomName, getChatWsUrl } from '../../../shared/utils/roomNames'
 const MESSAGE_ARRAY = 'messages'
 
 export function useYChatRoom(workspaceId: string, channelId: string) {
-  const profile = useAuthStore((state) => state.profile)
-  const user = useMemo<PresenceUser | null>(() => profile, [profile])
+  const authUser = useAuthStore((state) => state.user)
+  const profile = useMemo(() => (authUser ? authUserToProfile(authUser) : null), [authUser])
+  const user = useMemo<PresenceUser | null>(() => (authUser ? authUserToPresenceUser(authUser) : null), [authUser])
   const roomName = useMemo(() => getChatRoomName(workspaceId, channelId), [channelId, workspaceId])
   const wsUrl = useMemo(() => getChatWsUrl(workspaceId, channelId), [channelId, workspaceId])
   const doc = useYDoc(roomName)

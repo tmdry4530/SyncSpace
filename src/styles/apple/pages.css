@@ -133,7 +133,7 @@
 .ap-pg-bullet strong { font-weight: 600; }
 .ap-pg-bullet .ap-pg-bullet-note { color: var(--muted); }
 
-/* supabase tables grid */
+/* data tables grid */
 .ap-pg-table-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

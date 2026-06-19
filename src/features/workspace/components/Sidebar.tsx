@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Plus, LayoutGrid, CornerDownLeft, PanelLeftOpen, X } from 'lucide-react'
+import { ChevronLeft, CornerDownLeft, LayoutGrid, Plus, X } from 'lucide-react'
 import { routes } from '../../../app/router/routes'
 import { ChannelList } from '../../channel/components/ChannelList'
 import { DocumentList } from '../../documents/components/DocumentList'
@@ -81,68 +81,104 @@ export function Sidebar({ workspaceId, onMobileClose }: SidebarProps) {
   }
 
   return (
-    <aside className={isCollapsed ? 'sidebar collapsed' : 'sidebar'}>
-      <div className="sidebar-brand">
-        <Link className="brand-lockup" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
-          <span className="brand-icon" aria-hidden="true">S</span>
-          <span className="brand-wordmark">SyncSpace</span>
+    <aside className="ap-shell-rail">
+      <div className="ap-shell-rail-brand">
+        <Link
+          className="ap-shell-brand-lockup"
+          to={routes.workspace(workspaceId)}
+          onClick={(event) => {
+            if (isCollapsed) {
+              // Collapsed: the logo IS the expand trigger (there is no separate open button).
+              event.preventDefault()
+              toggleCollapsed()
+            } else {
+              onMobileClose?.()
+            }
+          }}
+          aria-label={isCollapsed ? '사이드바 펼치기' : undefined}
+          title={isCollapsed ? '펼치기' : undefined}
+        >
+          <span className="ap-shell-brand-icon" aria-hidden="true">S</span>
+          <span className="ap-shell-brand-wordmark">SyncSpace</span>
         </Link>
         {onMobileClose ? (
-          <button className="mobile-sidebar-close" onClick={onMobileClose} type="button" aria-label="사이드바 닫기">
-            <X size={18} />
+          <button className="ap-shell-mobile-close" onClick={onMobileClose} type="button" aria-label="사이드바 닫기">
+            <X size={18} aria-hidden="true" />
             닫기
           </button>
         ) : null}
-        <button className="collapse-button" onClick={toggleCollapsed} type="button" aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}>
-          {isCollapsed ? <PanelLeftOpen size={18} /> : <ChevronLeft size={18} />}
-          <span>{isCollapsed ? '펼치기' : '접기'}</span>
+        {/* Collapse button — hidden by CSS when collapsed (logo handles expand) and in the mobile drawer. */}
+        <button
+          className="ap-shell-collapse-btn"
+          onClick={toggleCollapsed}
+          type="button"
+          aria-label="사이드바 접기"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+          <span className="ap-shell-collapse-label">접기</span>
         </button>
       </div>
-      <div className="sidebar-content">
-          <div className="sidebar-section sidebar-home">
-            <Link aria-label="워크스페이스 홈" className="sidebar-workspace-link" title="워크스페이스" to={routes.workspace(workspaceId)} onClick={onMobileClose}>
-              <LayoutGrid aria-hidden="true" size={16} />
-              <span className="nav-label">워크스페이스</span>
-            </Link>
+      <div className="ap-shell-rail-body">
+        <div className="ap-shell-nav-primary">
+          <Link
+            aria-label="워크스페이스 홈"
+            className="ap-shell-nav-link"
+            title="워크스페이스"
+            to={routes.workspace(workspaceId)}
+            onClick={onMobileClose}
+          >
+            <LayoutGrid aria-hidden="true" size={17} />
+            <span className="nav-label">워크스페이스</span>
+          </Link>
+        </div>
+        <div className="ap-shell-section">
+          <div className="ap-shell-section-head">
+            <p className="ap-shell-section-label">채널</p>
+            <button
+              className="ap-shell-rail-add"
+              onClick={toggleChannelInput}
+              aria-label="채널 추가"
+              title="채널 추가"
+              type="button"
+            >
+              <Plus size={16} aria-hidden="true" />
+            </button>
           </div>
-          <div className="sidebar-section sidebar-section--channels">
-            <div className="sidebar-section-header">
-              <p className="eyebrow">채널</p>
-              <button className="icon-button small sidebar-add-btn" onClick={toggleChannelInput} aria-label="채널 추가" title="채널 추가" type="button">
-                <Plus size={16} />
-                <span className="sidebar-add-label">채널</span>
+          <ChannelList workspaceId={workspaceId} onNavigate={onMobileClose} />
+          {showChannelInput && (
+            <form className="inline-create ap-shell-rail-create" onSubmit={submitChannel}>
+              <input value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="새 채널 이름" autoFocus />
+              <button disabled={createChannel.isPending} type="submit" aria-label="만들기">
+                <CornerDownLeft size={16} aria-hidden="true" />
               </button>
-            </div>
-            <ChannelList workspaceId={workspaceId} onNavigate={onMobileClose} />
-            {showChannelInput && (
-              <form className="inline-create" onSubmit={submitChannel}>
-                <input value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="새 채널 이름" autoFocus />
-                <button disabled={createChannel.isPending} type="submit" aria-label="만들기">
-                  <CornerDownLeft size={16} />
-                </button>
-              </form>
-            )}
-            {channelError ? <p className="form-error compact" role="alert">채널 생성 실패: {channelError}</p> : null}
+            </form>
+          )}
+          {channelError ? <p className="form-error" role="alert">채널 생성 실패: {channelError}</p> : null}
+        </div>
+        <div className="ap-shell-section">
+          <div className="ap-shell-section-head">
+            <p className="ap-shell-section-label">문서</p>
+            <button
+              className="ap-shell-rail-add"
+              onClick={toggleDocumentInput}
+              aria-label="문서 추가"
+              title="문서 추가"
+              type="button"
+            >
+              <Plus size={16} aria-hidden="true" />
+            </button>
           </div>
-          <div className="sidebar-section sidebar-section--documents">
-            <div className="sidebar-section-header">
-              <p className="eyebrow">문서</p>
-              <button className="icon-button small sidebar-add-btn" onClick={toggleDocumentInput} aria-label="문서 추가" title="문서 추가" type="button">
-                <Plus size={16} />
-                <span className="sidebar-add-label">문서</span>
+          <DocumentList workspaceId={workspaceId} onNavigate={onMobileClose} />
+          {showDocumentInput && (
+            <form className="inline-create ap-shell-rail-create" onSubmit={submitDocument}>
+              <input data-document-title-input value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} placeholder="새 문서 이름" autoFocus />
+              <button disabled={createDocument.isPending} type="submit" aria-label="만들기">
+                <CornerDownLeft size={16} aria-hidden="true" />
               </button>
-            </div>
-            <DocumentList workspaceId={workspaceId} onNavigate={onMobileClose} />
-            {showDocumentInput && (
-              <form className="inline-create" onSubmit={submitDocument}>
-                <input data-document-title-input value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} placeholder="새 문서 이름" autoFocus />
-                <button disabled={createDocument.isPending} type="submit" aria-label="만들기">
-                  <CornerDownLeft size={16} />
-                </button>
-              </form>
-            )}
-            {documentError ? <p className="form-error compact" role="alert">문서 생성 실패: {documentError}</p> : null}
-          </div>
+            </form>
+          )}
+          {documentError ? <p className="form-error" role="alert">문서 생성 실패: {documentError}</p> : null}
+        </div>
       </div>
     </aside>
   )

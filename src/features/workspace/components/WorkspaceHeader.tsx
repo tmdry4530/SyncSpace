@@ -33,8 +33,18 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
         setInviteOpen(false)
       }
     }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+        setInviteOpen(false)
+      }
+    }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [])
 
   async function signOut() {
@@ -49,43 +59,51 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <header className="workspace-header">
-      <div className="header-brand">
-        <p className="eyebrow">현재 워크스페이스</p>
-        <h2>{workspace?.name ?? '워크스페이스'}</h2>
+    <header className="ap-shell-header">
+      <div className="ap-shell-header-brand">
+        <p className="ap-shell-eyebrow">현재 워크스페이스</p>
+        <div className="ap-shell-ws-trigger" aria-label="현재 워크스페이스">
+          <h2>{workspace?.name ?? '워크스페이스'}</h2>
+        </div>
       </div>
-      
-      <div className="header-actions">
+
+      <div className="ap-shell-actions">
         <button
-          className="icon-button"
+          type="button"
+          className="ap-shell-icon-btn"
           onClick={() => setTheme(nextTheme)}
           aria-label={`테마: ${themeLabel} (클릭하여 변경)`}
           title={`테마: ${themeLabel}`}
-          type="button"
         >
           <ThemeIcon size={16} aria-hidden="true" />
         </button>
 
         {workspace?.inviteCode && (
-          <div className="dropdown-container" ref={inviteRef}>
-            <button 
-              className={inviteOpen ? 'invite-trigger open' : 'invite-trigger'} 
-              onClick={() => setInviteOpen(!inviteOpen)} 
+          <div className="ap-shell-dropdown" ref={inviteRef}>
+            <button
+              className={inviteOpen ? 'ap-shell-pill-btn open' : 'ap-shell-pill-btn'}
+              onClick={() => setInviteOpen(!inviteOpen)}
               aria-expanded={inviteOpen}
+              aria-haspopup="true"
               aria-label="초대 코드 보기"
               type="button"
             >
-              <KeyRound size={16} />
+              <KeyRound size={13} aria-hidden="true" />
               <span>초대 코드</span>
-              <ChevronDown size={14} aria-hidden="true" />
+              <ChevronDown size={13} aria-hidden="true" />
             </button>
             {inviteOpen && (
-              <div className="dropdown-menu">
-                <div className="dropdown-header">팀원 초대 코드</div>
-                <div className="invite-box">
-                  <span className="invite-code">{workspace.inviteCode}</span>
-                  <button className="button ghost small invite-copy-button" onClick={copyInviteCode} type="button" aria-label="초대 코드 복사">
-                    {copied ? <Check size={16} /> : <Copy size={16} />}
+              <div className="ap-shell-menu">
+                <div className="ap-shell-menu-header">팀원 초대 코드</div>
+                <div className="ap-shell-invite-box">
+                  <span className="ap-shell-invite-code">{workspace.inviteCode}</span>
+                  <button
+                    className="ap-shell-mini-btn"
+                    onClick={copyInviteCode}
+                    type="button"
+                    aria-label="초대 코드 복사"
+                  >
+                    {copied ? <Check size={16} aria-hidden="true" /> : <Copy size={16} aria-hidden="true" />}
                     {copied ? '복사됨' : '복사'}
                   </button>
                 </div>
@@ -94,34 +112,35 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
           </div>
         )}
 
-        <Link className="workspace-switch-link" to={routes.workspaces}>
-          <LayoutGrid size={15} />
+        <Link className="ap-shell-pill-btn" to={routes.workspaces}>
+          <LayoutGrid size={13} aria-hidden="true" />
           <span>워크스페이스 목록</span>
         </Link>
 
-        <div className="dropdown-container" ref={menuRef}>
-          <button 
-            className="user-menu-button" 
+        <div className="ap-shell-dropdown" ref={menuRef}>
+          <button
+            className="ap-shell-agent-btn"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-expanded={menuOpen}
+            aria-haspopup="true"
             aria-label="사용자 메뉴"
             type="button"
           >
             <span className="user-chip" style={{ ['--chip-color' as string]: profile?.color ?? '#94a3b8' }}>
-              <User size={14} style={{ marginRight: '6px' }} />
+              <User size={14} style={{ marginRight: '6px' }} aria-hidden="true" />
               {displayName}
             </span>
           </button>
-          
+
           {menuOpen && (
-            <div className="dropdown-menu">
-              <div className="dropdown-item user-info">
+            <div className="ap-shell-menu">
+              <div className="ap-shell-menu-item ap-shell-user-info">
                 <strong>{displayName}</strong>
                 <small>{user?.email}</small>
               </div>
-              <div className="dropdown-divider"></div>
-              <button className="dropdown-item text-danger" onClick={signOut} type="button">
-                <LogOut size={16} />
+              <div className="ap-shell-menu-divider"></div>
+              <button className="ap-shell-menu-item text-danger" onClick={signOut} type="button">
+                <LogOut size={16} aria-hidden="true" />
                 로그아웃
               </button>
             </div>

@@ -7,6 +7,7 @@ import { EditorPanel } from '../../features/editor/components/EditorPanel'
 import { useDocumentsQuery } from '../../features/documents/queries/useDocumentsQuery'
 import { usePresenceUiStore } from '../../shared/stores/presenceStore'
 import { useWorkspaceUiStore } from '../../shared/stores/workspaceUiStore'
+import '../../styles/apple/workbench.css'
 
 export function WorkspaceSplitPage() {
   const { workspaceId, channelId, documentId } = useParams()
@@ -18,7 +19,7 @@ export function WorkspaceSplitPage() {
   const { data: channels = [], isLoading: channelsLoading } = useChannelsQuery(workspaceId)
   const { data: documents = [], isLoading: documentsLoading } = useDocumentsQuery(workspaceId)
   const [bannerDismissed, setBannerDismissed] = useState(() => readHelpDismissed())
-  const [chatWidth, setChatWidth] = useState(40)
+  const [chatPx, setChatPx] = useState(340)
   const [isDragging, setIsDragging] = useState(false)
   const [activeMobilePane, setActiveMobilePane] = useState<'chat' | 'document'>('chat')
 
@@ -58,8 +59,9 @@ export function WorkspaceSplitPage() {
       const container = document.querySelector('.split-workbench')
       if (!container) return
       const rect = container.getBoundingClientRect()
-      const newPercentage = ((event.clientX - rect.left) / rect.width) * 100
-      if (newPercentage > 24 && newPercentage < 68) setChatWidth(newPercentage)
+      // Chat lives in the right column; size it from the right edge.
+      const newWidth = rect.right - event.clientX
+      if (newWidth > 280 && newWidth < 560) setChatPx(newWidth)
     }
 
     const handleMouseUp = () => setIsDragging(false)
@@ -85,90 +87,101 @@ export function WorkspaceSplitPage() {
     setBannerDismissed(true)
   }
 
+  const docTitle = selectedDocument?.title ?? '문서'
+  const channelLabel = selectedChannel ? `#${selectedChannel.name}` : '채팅'
+  // Chat column width in px (document-dominant per the mock); adjusted by the resizer.
+  const chatColWidth = `${chatPx}px`
+
   return (
-    <section className="workspace-canvas" aria-label="채팅과 문서 동시 협업 화면">
-      <div className="workbench-commandbar">
-        <div className="workbench-commandbar-copy">
-          <p className="eyebrow">워크벤치</p>
-          <h1>
-            {selectedChannel ? `#${selectedChannel.name}` : '채팅'} · {selectedDocument?.title ?? '문서'}
-          </h1>
-          {!bannerDismissed ? (
-            <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p>
-          ) : null}
+    <section className="workspace-canvas ap-wb-canvas" aria-label="채팅과 문서 동시 협업 화면">
+      {!bannerDismissed ? (
+        <div className="ap-wb-intro">
+          <p>채팅에서 결정하고, 같은 화면의 문서에서 바로 정리하세요.</p>
         </div>
-        <div className="workbench-commandbar-actions">
-          <span className={`status-summary ${unifiedStatus}`} aria-label={`${statusLabel}, ${presenceCount}명 접속 중`}>
-            <span>{statusLabel}</span>
-            <em>{presenceCount}명 접속 중</em>
-          </span>
-          {!bannerDismissed ? (
-            <button className="banner-dismiss-button" onClick={dismissWorkbenchHelp} type="button">
-              <EyeOff size={15} />
-              안내 숨기기
-            </button>
-          ) : null}
-        </div>
-      </div>
+      ) : null}
 
-      <div className="mobile-pane-switcher" role="tablist" aria-label="모바일 작업 패널 선택">
-        <button
-          className={activeMobilePane === 'chat' ? 'active' : ''}
-          onClick={() => setActiveMobilePane('chat')}
-          type="button"
-          role="tab"
-          aria-selected={activeMobilePane === 'chat'}
-        >
-          채팅
-        </button>
-        <button
-          className={activeMobilePane === 'document' ? 'active' : ''}
-          onClick={() => setActiveMobilePane('document')}
-          type="button"
-          role="tab"
-          aria-selected={activeMobilePane === 'document'}
-        >
-          문서
-        </button>
-      </div>
-
-      <div className="split-workbench" style={{ ['--chat-pane-width' as string]: `${chatWidth}%` }}>
-        <div className={`split-pane chat-side ${activeMobilePane === 'chat' ? 'mobile-active' : ''}`}>
-          {selectedChannelId ? (
-            <ChatPanel
-              workspaceId={workspaceId}
-              channelId={selectedChannelId}
-              channelName={selectedChannel?.name}
-              hideStatus
-              variant="workbench"
-            />
-          ) : (
-            <EmptySplitPane title="채널이 없습니다" copy="왼쪽 사이드바에서 첫 채널을 만들면 이곳에서 바로 대화할 수 있습니다." loading={isLoading} />
-          )}
+      <div className="ap-wb-frame">
+        <div className="ap-wb-topbar">
+          <div className="ap-wb-topbar-title">
+            <span className="ap-wb-topbar-tag">워크벤치</span>
+            <span className="ap-wb-topbar-name">
+              {channelLabel} · {docTitle}
+            </span>
+          </div>
+          <div className="ap-wb-topbar-actions">
+            <span
+              className={`ap-wb-presence-pill is-${unifiedStatus}`}
+              aria-label={`${statusLabel}, ${presenceCount}명 접속 중`}
+            >
+              <span className="ap-wb-dot" aria-hidden="true" />
+              {presenceCount > 0 ? `${presenceCount}명 접속 중` : statusLabel}
+            </span>
+            {!bannerDismissed ? (
+              <button className="ap-wb-dismiss" onClick={dismissWorkbenchHelp} type="button">
+                <EyeOff size={14} />
+                안내 숨기기
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <button
-          className={`resizer ${isDragging ? 'dragging' : ''}`}
-          onMouseDown={() => setIsDragging(true)}
-          type="button"
-          aria-label="채팅과 문서 패널 너비 조절"
-        >
-          <span className="resizer-handle" />
-        </button>
+        <div className="ap-wb-mobile-switch" role="tablist" aria-label="모바일 작업 패널 선택">
+          <button
+            className={activeMobilePane === 'document' ? 'is-active' : ''}
+            onClick={() => setActiveMobilePane('document')}
+            type="button"
+            role="tab"
+            aria-selected={activeMobilePane === 'document'}
+          >
+            문서
+          </button>
+          <button
+            className={activeMobilePane === 'chat' ? 'is-active' : ''}
+            onClick={() => setActiveMobilePane('chat')}
+            type="button"
+            role="tab"
+            aria-selected={activeMobilePane === 'chat'}
+          >
+            채팅
+          </button>
+        </div>
 
-        <div className={`split-pane doc-side ${activeMobilePane === 'document' ? 'mobile-active' : ''}`}>
-          {selectedDocumentId ? (
-            <EditorPanel
-              workspaceId={workspaceId}
-              documentId={selectedDocumentId}
-              documentTitle={selectedDocument?.title}
-              documents={documents}
-              hideStatus
-              variant="workbench"
-            />
-          ) : (
-            <EmptySplitPane title="문서가 없습니다" copy="왼쪽 사이드바에서 첫 문서를 만들면 이곳에서 바로 공동 편집할 수 있습니다." loading={isLoading} />
-          )}
+        <div className="split-workbench ap-wb-body" style={{ ['--ap-wb-chat-w' as string]: chatColWidth }}>
+          <div className={`split-pane doc-side ap-wb-pane ap-wb-pane--doc ${activeMobilePane === 'document' ? 'mobile-active is-mobile-active' : ''}`}>
+            {selectedDocumentId ? (
+              <EditorPanel
+                workspaceId={workspaceId}
+                documentId={selectedDocumentId}
+                documentTitle={selectedDocument?.title}
+                documents={documents}
+                hideStatus
+                variant="workbench"
+              />
+            ) : (
+              <EmptySplitPane title="문서가 없습니다" copy="왼쪽 사이드바에서 첫 문서를 만들면 이곳에서 바로 공동 편집할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
+
+          <button
+            className={`resizer ap-wb-resizer ${isDragging ? 'dragging is-dragging' : ''}`}
+            onMouseDown={() => setIsDragging(true)}
+            type="button"
+            aria-label="문서와 채팅 패널 너비 조절"
+          />
+
+          <div className={`split-pane chat-side ap-wb-pane ap-wb-pane--chat ${activeMobilePane === 'chat' ? 'mobile-active is-mobile-active' : ''}`}>
+            {selectedChannelId ? (
+              <ChatPanel
+                workspaceId={workspaceId}
+                channelId={selectedChannelId}
+                channelName={selectedChannel?.name}
+                hideStatus
+                variant="workbench"
+              />
+            ) : (
+              <EmptySplitPane title="채널이 없습니다" copy="왼쪽 사이드바에서 첫 채널을 만들면 이곳에서 바로 대화할 수 있습니다." loading={isLoading} />
+            )}
+          </div>
         </div>
       </div>
     </section>
@@ -198,8 +211,8 @@ function readHelpDismissed(): boolean {
 
 function EmptySplitPane({ title, copy, loading }: { title: string; copy: string; loading: boolean }) {
   return (
-    <div className="empty-split-pane">
-      <p className="eyebrow">{loading ? 'LOADING' : 'EMPTY'}</p>
+    <div className="empty-split-pane ap-wb-empty-pane">
+      <p className="eyebrow ap-wb-eyebrow">{loading ? 'LOADING' : 'EMPTY'}</p>
       <h2>{loading ? '불러오는 중...' : title}</h2>
       <p>{loading ? '워크스페이스 항목을 확인하고 있습니다.' : copy}</p>
     </div>

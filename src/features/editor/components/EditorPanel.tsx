@@ -6,6 +6,7 @@ import type { DocumentMeta } from '../../../shared/types/contracts'
 import { useYEditorRoom } from '../realtime/useYEditorRoom'
 import { useCollaborativeEditor } from '../hooks/useCollaborativeEditor'
 import { EditorKnowledgeRail } from './EditorKnowledgeRail'
+import { getEditorInsights } from '../utils/editorInsights'
 import { filterSlashCommands, SlashCommandMenu, type SlashCommandItem } from './SlashCommandMenu'
 
 interface SlashCommandState {
@@ -46,6 +47,18 @@ export function EditorPanel({
   const slashModeRef = useRef(false)
   const slashInputAtRef = useRef(0)
   const slashItems = useMemo(() => filterSlashCommands(slashState?.query ?? ''), [slashState?.query])
+  const [docRevision, setDocRevision] = useState(0)
+  const insights = useMemo(() => getEditorInsights(editor, documents), [documents, editor, docRevision])
+
+  useEffect(() => {
+    if (!editor) return
+    const bump = () => setDocRevision((value) => value + 1)
+    bump()
+    editor.on('update', bump)
+    return () => {
+      editor.off('update', bump)
+    }
+  }, [editor])
 
   useEffect(() => {
     onStatusChange?.(status)
@@ -173,17 +186,53 @@ export function EditorPanel({
     [activeSlashIndex, runSlashCommand, slashItems, slashState]
   )
 
-  return (
-    <section className={`editor-panel ${isWorkbenchPane ? 'editor-panel--workbench' : ''}`}>
-      <header className={`panel-title ${isWorkbenchPane ? 'panel-title--workbench' : ''}`}>
-        <div>
-          {isWorkbenchPane ? null : <p className="eyebrow">문서</p>}
-          <h1>{isWorkbenchPane ? '문서' : documentTitle ?? `문서 ${documentId.slice(0, 8)}`}</h1>
-          {isWorkbenchPane ? null : <p className="editor-mode-hint">/ 명령 · [[문서링크]] · #태그</p>}
+  if (isWorkbenchPane) {
+    const heroTitle = documentTitle ?? `문서 ${documentId.slice(0, 8)}`
+    const statusLabel = status === 'connected' ? '실시간 동기화' : status === 'connecting' ? '연결 중' : '재연결 중'
+    return (
+      <section className="editor-panel editor-panel--workbench ap-wb-doc">
+        <div className="ap-wb-doc-hero">
+          <div className="ap-wb-doc-kicker">문서 · / 명령 · [[링크]] · #태그</div>
+          <h1 className="ap-wb-doc-title">{heroTitle}</h1>
+          <div className="ap-wb-doc-stats" aria-label="문서 요약">
+            <span>
+              <strong>{insights.wordCount}</strong> 단어
+            </span>
+            <span>
+              <strong>{insights.headings.length}</strong> 제목
+            </span>
+            <span>{statusLabel}</span>
+          </div>
         </div>
-        {hideStatus || isWorkbenchPane ? null : <span className={`status-pill ${status}`}>{status}</span>}
+        <div className="ap-wb-doc-body">
+          <div className="editor-surface ap-wb-doc-surface" onKeyDownCapture={handleSlashKeyDown}>
+            {slashState ? (
+              <SlashCommandMenu
+                items={slashItems}
+                activeIndex={activeSlashIndex}
+                query={slashState.query}
+                onSelect={runSlashCommand}
+              />
+            ) : null}
+            <EditorContent editor={editor} />
+          </div>
+          <EditorKnowledgeRail editor={editor} workspaceId={workspaceId} documents={documents} variant="workbench" />
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="editor-panel">
+      <header className="panel-title">
+        <div>
+          <p className="eyebrow">문서</p>
+          <h1>{documentTitle ?? `문서 ${documentId.slice(0, 8)}`}</h1>
+          <p className="editor-mode-hint">/ 명령 · [[문서링크]] · #태그</p>
+        </div>
+        {hideStatus ? null : <span className={`status-pill ${status}`}>{status}</span>}
       </header>
-      {isWorkbenchPane ? null : <PresenceBar states={realtime.presence} />}
+      <PresenceBar states={realtime.presence} />
       <div className="editor-workspace">
         <div className="editor-surface" onKeyDownCapture={handleSlashKeyDown}>
           {slashState ? (

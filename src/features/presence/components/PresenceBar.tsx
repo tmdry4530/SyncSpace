@@ -7,7 +7,7 @@ export function PresenceBar({ states: providedStates }: { states?: AwarenessStat
   const states = providedStates ?? storeStates
 
   return (
-    <div className="presence-bar">
+    <div className="presence-bar ap-wb-presence-row">
       <UserAvatarStack states={states} />
       <span>{states.length > 0 ? `${states.length}명 접속 중` : 'presence 대기 중'}</span>
     </div>

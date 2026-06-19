@@ -6,9 +6,10 @@ import { useChatUiStore } from '../../../shared/stores/chatUiStore'
 interface MessageComposerProps {
   channelId: string
   onSend: (input: { content: string; userId: string }) => void
+  variant?: 'default' | 'workbench'
 }
 
-export function MessageComposer({ channelId, onSend }: MessageComposerProps) {
+export function MessageComposer({ channelId, onSend, variant = 'default' }: MessageComposerProps) {
   const user = useAuthStore((state) => state.user)
   const draft = useChatUiStore((state) => state.draftByChannelId[channelId] ?? '')
   const setDraft = useChatUiStore((state) => state.setDraft)
@@ -22,8 +23,10 @@ export function MessageComposer({ channelId, onSend }: MessageComposerProps) {
     clearDraft(channelId)
   }
 
+  const isWorkbench = variant === 'workbench'
+
   return (
-    <form className="message-composer" onSubmit={handleSubmit}>
+    <form className={`message-composer ${isWorkbench ? 'message-composer--workbench ap-wb-composer' : ''}`} onSubmit={handleSubmit}>
       <input
         value={draft}
         onChange={(event) => setDraft(channelId, event.target.value)}

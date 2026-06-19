@@ -1,5 +1,8 @@
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { readFile, stat } from 'node:fs/promises'
+import { extname, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { isOriginAllowed, readConfig, type ServerConfig } from '../config.js'
 import { createRealtimeAuthorizer, type RealtimeAuthorizer } from '../auth/realtimeAuth.js'
 import { createMessagePersistenceAdapter, type MessagePersistenceAdapter } from '../persistence/messagePersistence.js'
@@ -15,6 +18,8 @@ import { registerAuthRoutes } from './routes/authRoutes.js'
 import { registerWorkspaceRoutes } from './routes/workspaceRoutes.js'
 import { getQueueStats } from '../db/repositories/jobRepository.js'
 import { hasDatabaseConfig } from '../config.js'
+
+const DEFAULT_FRONTEND_DIST_DIR = fileURLToPath(new URL('../../../dist/', import.meta.url))
 
 export interface SyncSpaceServerOptions {
   config?: ServerConfig
@@ -129,6 +134,7 @@ async function dispatch(
 
     const match = router.match(ctx.method, ctx.pathname)
     if (!match) {
+      if (await tryServeFrontend(ctx, response, cors, logger)) return
       sendResponse(response, json({ code: 'not_found', message: 'Route not found' }, 404), cors)
       return
     }
@@ -144,6 +150,122 @@ async function dispatch(
     }
     logger.error('Unhandled HTTP error', { error: error instanceof Error ? error.message : String(error) })
     sendResponse(response, json({ code: 'internal_error', message: '서버 요청 처리 중 문제가 발생했습니다.' }, 500), cors)
+  }
+}
+
+async function tryServeFrontend(
+  ctx: RequestContext,
+  response: ServerResponse,
+  headers: Record<string, string>,
+  logger: Logger
+): Promise<boolean> {
+  if (ctx.method !== 'GET' && ctx.method !== 'HEAD') return false
+  if (isBackendPath(ctx.pathname)) return false
+
+  const asset = await resolveFrontendAsset(ctx.pathname)
+  if (!asset) return false
+
+  try {
+    const body = ctx.method === 'HEAD' ? null : await readFile(asset.path)
+    response.writeHead(200, {
+      ...headers,
+      'content-type': asset.contentType,
+      'cache-control': asset.cacheControl
+    })
+    response.end(body)
+    return true
+  } catch (error) {
+    logger.warn('Failed to serve frontend asset', {
+      path: ctx.pathname,
+      error: error instanceof Error ? error.message : String(error)
+    })
+    return false
+  }
+}
+
+async function resolveFrontendAsset(pathname: string): Promise<{ path: string; contentType: string; cacheControl: string } | null> {
+  const directPath = safeStaticPath(pathname)
+  if (directPath && await isFile(directPath)) {
+    return {
+      path: directPath,
+      contentType: contentTypeFor(directPath),
+      cacheControl: pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'
+    }
+  }
+
+  if (!shouldServeSpaFallback(pathname)) return null
+
+  const indexPath = safeStaticPath('/index.html')
+  if (!indexPath || !(await isFile(indexPath))) return null
+  return {
+    path: indexPath,
+    contentType: 'text/html; charset=utf-8',
+    cacheControl: 'no-cache'
+  }
+}
+
+function safeStaticPath(pathname: string): string | null {
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(pathname)
+  } catch {
+    return null
+  }
+  const normalized = decoded.replace(/^\/+/, '')
+  const root = frontendDistDir()
+  const resolvedPath = resolve(root, normalized)
+  if (resolvedPath !== root && !resolvedPath.startsWith(`${root}${sep}`)) return null
+  return resolvedPath
+}
+
+function frontendDistDir(): string {
+  return resolve(process.env.FRONTEND_DIST_DIR || DEFAULT_FRONTEND_DIST_DIR)
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile()
+  } catch {
+    return false
+  }
+}
+
+function shouldServeSpaFallback(pathname: string): boolean {
+  if (pathname.startsWith('/assets/')) return false
+  if (extname(pathname)) return false
+  return true
+}
+
+function isBackendPath(pathname: string): boolean {
+  return (
+    pathname === '/health' ||
+    pathname === '/ready' ||
+    pathname.startsWith('/api/') ||
+    pathname.startsWith('/chat/') ||
+    pathname.startsWith('/doc/')
+  )
+}
+
+function contentTypeFor(path: string): string {
+  switch (extname(path).toLowerCase()) {
+    case '.html':
+      return 'text/html; charset=utf-8'
+    case '.js':
+      return 'text/javascript; charset=utf-8'
+    case '.css':
+      return 'text/css; charset=utf-8'
+    case '.json':
+      return 'application/json; charset=utf-8'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.ico':
+      return 'image/x-icon'
+    case '.txt':
+      return 'text/plain; charset=utf-8'
+    case '.map':
+      return 'application/json; charset=utf-8'
+    default:
+      return 'application/octet-stream'
   }
 }
 

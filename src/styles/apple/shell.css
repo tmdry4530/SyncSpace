@@ -484,31 +484,6 @@
   box-shadow: none;
 }
 
-/* spectator badge — observe-only marker (NON-interactive) */
-.ap-shell-spectator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--surface-low);
-  border: 1px solid var(--line);
-  border-radius: 980px;
-  padding: 5px 11px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text);
-  white-space: nowrap;
-}
-.ap-shell-spectator::before {
-  content: '';
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  background-color: currentColor;
-  -webkit-mask: var(--ap-shell-eye-mask) center / contain no-repeat;
-  mask: var(--ap-shell-eye-mask) center / contain no-repeat;
-  --ap-shell-eye-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M6.6 6.6A18.5 18.5 0 0 0 2 12s3 8 10 8a9.1 9.1 0 0 0 5.4-1.6'/%3E%3Cpath d='M2 2l20 20'/%3E%3C/svg%3E");
-}
-
 /* pill trigger (invite code) */
 .ap-shell-pill-btn {
   display: inline-flex;
@@ -534,7 +509,7 @@
   flex-shrink: 0;
 }
 
-/* agent chip pill */
+/* user menu trigger (wraps main's .user-chip) */
 .ap-shell-agent-btn {
   background: transparent;
   border: none;
@@ -546,36 +521,6 @@
   transform: none;
   box-shadow: none;
   background: transparent;
-}
-.ap-shell-agent-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--ap-chip-color, var(--accent));
-  border-radius: 980px;
-  padding: 4px 12px 4px 5px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-}
-.ap-shell-agent-chip .ap-shell-agent-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--ap-chip-color, var(--accent));
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ap-shell-agent-chip .ap-shell-agent-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 18ch;
 }
 
 /* =========================================================================
@@ -1055,9 +1000,6 @@
   .ap-shell-actions {
     gap: 6px;
   }
-  .ap-shell-agent-chip .ap-shell-agent-name {
-    max-width: 10ch;
-  }
   .ap-shell-ws-trigger h2 {
     max-width: 50vw;
   }
@@ -1072,7 +1014,7 @@
     height: 44px;
   }
   .ap-shell-pill-btn,
-  .ap-shell-agent-btn .ap-shell-agent-chip,
+  .ap-shell-agent-btn,
   .ap-shell-mini-btn,
   .ap-shell-menu-item,
   .ap-shell-nav-link,

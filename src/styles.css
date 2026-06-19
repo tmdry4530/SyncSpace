@@ -429,7 +429,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 .workspace-index {
   min-height: 100vh;
   background:
-    radial-gradient(circle at 12% 12%, oklch(0.94 0.035 165 / 0.58), transparent 28rem),
+    radial-gradient(circle at 12% 12%, color-mix(in srgb, var(--accent-soft) 70%, transparent), transparent 28rem),
     linear-gradient(180deg, var(--bg), var(--surface-low));
 }
 .workspace-index-user { display: flex; align-items: center; gap: 1rem; color: var(--muted-strong); font-size: 0.78rem; }
@@ -461,8 +461,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 94% 0%, oklch(0.92 0.05 165 / 0.72), transparent 34%),
-    linear-gradient(135deg, oklch(0.99 0.006 110), oklch(0.965 0.01 230));
+    radial-gradient(circle at 94% 0%, color-mix(in srgb, var(--accent-soft) 80%, transparent), transparent 34%),
+    linear-gradient(135deg, var(--surface), var(--surface-low));
   box-shadow: var(--shadow-soft);
   padding: clamp(1.2rem, 3vw, 1.7rem);
 }
@@ -487,9 +487,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 }
 .workspace-focus-stats div {
   min-width: 5.5rem;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-translucent);
   padding: 0.75rem 0.8rem;
 }
 .workspace-focus-stats dt {
@@ -518,7 +518,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   transition: transform 130ms ease, border-color 130ms ease, box-shadow 130ms ease;
 }
 .workspace-tile:hover,
-.workspace-tile:focus-within { transform: translateY(-1px); border-color: var(--primary); box-shadow: 0 8px 22px rgba(15,23,42,0.08); }
+.workspace-tile:focus-within { transform: translateY(-1px); border-color: var(--primary); box-shadow: 0 8px 22px var(--shadow-hover); }
 .workspace-tile-link {
   min-width: 0;
   display: grid;
@@ -533,12 +533,12 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   display: grid;
   place-items: center;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   border-radius: var(--radius);
   font-weight: 800;
   letter-spacing: -0.03em;
 }
-.workspace-tile:nth-child(2n) .workspace-tile-link span { background: var(--accent-soft); color: #064e3b; }
+.workspace-tile:nth-child(2n) .workspace-tile-link span { background: var(--accent-soft); color: var(--success-strong); }
 .workspace-tile-link strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.95rem; }
 .workspace-tile-link small { color: var(--muted); justify-self: end; }
 .workspace-tile-link em { color: var(--muted); font-style: normal; font-size: 1.2rem; }
@@ -549,14 +549,14 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   border-left: 1px solid var(--line);
   border-radius: 0;
   padding: 0 0.85rem;
-  background: #fff7f7;
+  background: color-mix(in srgb, var(--danger-soft) 40%, var(--surface));
   color: var(--danger);
   font-size: 0.75rem;
   font-weight: 800;
 }
 .workspace-delete-button:hover {
-  background: #fee2e2;
-  color: #7f1d1d;
+  background: var(--danger-soft);
+  color: var(--danger-strong);
   box-shadow: none;
 }
 .empty-workspace-panel {
@@ -567,8 +567,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
   border: 1px dashed color-mix(in srgb, var(--line-strong) 82%, transparent);
   border-radius: 18px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(248, 250, 252, 0.92)),
-    repeating-linear-gradient(135deg, transparent 0 16px, rgba(15, 23, 42, 0.025) 16px 17px);
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 84%, transparent), color-mix(in srgb, var(--surface-low) 92%, transparent)),
+    repeating-linear-gradient(135deg, transparent 0 16px, color-mix(in srgb, var(--text) 4%, transparent) 16px 17px);
   padding: clamp(1.2rem, 4vw, 2rem);
 }
 .empty-workspace-panel h2 {
@@ -628,7 +628,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; box-shadow
 }
 .create-card h2 { margin: 0; font-size: 1rem; letter-spacing: -0.03em; }
 .create-card p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
-.rail-separator { display: flex; align-items: center; gap: 0.75rem; color: #a0a5aa; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; }
+.rail-separator { display: flex; align-items: center; gap: 0.75rem; color: var(--muted); font-size: 0.65rem; font-weight: 800; letter-spacing: 0.08em; }
 .rail-separator::before, .rail-separator::after { content: ''; height: 1px; flex: 1; background: var(--line); }
 
 /* Workspace shell */

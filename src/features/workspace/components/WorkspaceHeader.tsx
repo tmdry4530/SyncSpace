@@ -5,7 +5,8 @@ import { getSupabaseClient } from '../../../shared/api/supabaseClient'
 import { useAuthStore } from '../../../shared/stores/authStore'
 import { formatDisplayName } from '../../../shared/utils/displayName'
 import { useWorkspacesQuery } from '../queries/useWorkspacesQuery'
-import { Copy, Check, LogOut, LayoutGrid, User, KeyRound, ChevronDown } from 'lucide-react'
+import { Copy, Check, LogOut, LayoutGrid, User, KeyRound, ChevronDown, Sun, Moon, Monitor } from 'lucide-react'
+import { useTheme } from '../../../shared/hooks/useTheme'
 
 export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const { data: workspaces = [] } = useWorkspacesQuery()
@@ -14,6 +15,10 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
   const [copied, setCopied] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const nextTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor
+  const themeLabel = theme === 'system' ? '시스템' : theme === 'light' ? '라이트' : '다크'
   const workspace = workspaces.find((item) => item.id === workspaceId)
   const displayName = formatDisplayName(profile?.displayName ?? user?.email)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -51,6 +56,16 @@ export function WorkspaceHeader({ workspaceId }: { workspaceId: string }) {
       </div>
       
       <div className="header-actions">
+        <button
+          className="icon-button"
+          onClick={() => setTheme(nextTheme)}
+          aria-label={`테마: ${themeLabel} (클릭하여 변경)`}
+          title={`테마: ${themeLabel}`}
+          type="button"
+        >
+          <ThemeIcon size={16} aria-hidden="true" />
+        </button>
+
         {workspace?.inviteCode && (
           <div className="dropdown-container" ref={inviteRef}>
             <button 

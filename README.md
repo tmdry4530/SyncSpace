@@ -4,6 +4,8 @@
 
 채팅에서 나온 결정사항을 같은 워크스페이스의 문서에 바로 정리하는 협업 앱입니다. 채널 채팅과 공동 문서 편집을 하나의 화면에 배치하고, UI 상태·서버 상태·실시간 협업 상태를 분리해서 구현했습니다.
 
+> 📄 **케이스 스터디 (설계 결정 · 디버깅 · 회고)**: [한국어](./CASE_STUDY.md) · [English](./CASE_STUDY.en.md)
+
 ## 배포 주소
 
 - **Railway** (단일 서비스 — SPA + API + WebSocket + Postgres): https://server-production-cc9e.up.railway.app
